@@ -3,12 +3,12 @@
 using UnrealBuildTool;
 using System.Collections.Generic;
 
-public class TESTVehicleTarget : TargetRules
+public class HANSEIRacingTarget : TargetRules
 {
-	public TESTVehicleTarget(TargetInfo Target) : base(Target)
+	public HANSEIRacingTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Game;
 
-		ExtraModuleNames.AddRange( new string[] { "TESTVehicle" } );
+		ExtraModuleNames.AddRange( new string[] { "HANSEIRacing" } );
 	}
 }
