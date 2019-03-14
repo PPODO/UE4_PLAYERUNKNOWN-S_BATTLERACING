@@ -2,7 +2,6 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
-#include <sstream>
 #include "BaseGameMode.generated.h"
 
 UCLASS()
@@ -18,13 +17,26 @@ protected:
 	virtual void Tick(float DeltaTime) override;
 	virtual void BeginDestroy() override;
 
+protected:
+	int32 m_Port;
+	FString m_SocketName;
+
 public:
 	virtual void RecvDataProcessing(TCHAR* RecvMessage);
 
-private:
-	class FSocketComponent* m_ClientSocket;
+public:
+	UFUNCTION(BlueprintCallable)
+		FORCEINLINE bool GetConnected() { return m_bIsConnectedToServer; }
 
 public:
-	FORCEINLINE FSocketComponent* GetClientSocket() const { return m_ClientSocket; }
+	FORCEINLINE void SetConnected(bool b) { m_bIsConnectedToServer = b; }
+	FORCEINLINE class FSocketComponent* GetClientSocket() const { return m_Socket; }
+
+private:
+	class UHANSEIRacingGameInstance* m_GameInstance;
+	class FSocketComponent* m_Socket;
+
+private:
+	bool m_bIsConnectedToServer;
 
 };

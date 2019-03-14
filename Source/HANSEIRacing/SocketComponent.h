@@ -1,13 +1,13 @@
 #pragma once
 
 #include "Sockets.h"
-#include "Runnable.h"
 #include "CoreMinimal.h"
 #include "RunnableThread.h"
-#include <mutex>
+#include "Runnable.h"
 #include <iostream>
 #include <sstream>
 #include <vector>
+#include <mutex>
 
 static const int32 MaxBufferSize = 1024;
 
@@ -18,9 +18,9 @@ private:
 	std::mutex m_Lock;
 
 private:
-	const int32 m_Port;
 	FSocket* m_Socket;
-	uint8 m_RecvBuffer[MaxBufferSize];
+	TSharedPtr<FInternetAddr> m_Address;
+	uint8 MessageBuffer[MaxBufferSize];
 
 private:
 	class ABaseGameMode* m_GameMode;
@@ -29,25 +29,42 @@ protected:
 	virtual void Stop() override;
 
 public:
-	FSocketComponent(class ABaseGameMode* GM, const int32 Port);
+	FSocketComponent();
 	virtual ~FSocketComponent() override;
 
+public:
 	virtual bool Init() override;
 	virtual uint32 Run() override;
 
 public:
+	void ConnectToServer(class ABaseGameMode* GM, int32 Port, const FString& SocketName);
+	void DisconnectSocket();
 	void StopThread();
-
-public:
 	void Send(const ANSICHAR* Message, uint32 Length);
 
 };
 
 namespace PACKET {
-	enum EFAILED {
-		EF_EXIST,
-		EF_FAILED,
-		EF_SUCCESSED
+	enum EJOINFAILED {
+		EJF_NONE = -1,
+		EJF_FAILED,
+		EJF_INVALIDSESSION,
+		EJF_WRONGPASS,
+		EJF_MAXPLAYER,
+		EJF_SUCCEED
+	};
+}
+
+namespace GAMEPACKET {
+	enum PACKETMESSAGE {
+		PM_JOIN,
+		PM_DISCONNECT,
+		PM_COUNT
+	};
+
+	enum EJOINSTATE {
+		EJS_FAILED,
+		EJS_SUCCEDD
 	};
 }
 

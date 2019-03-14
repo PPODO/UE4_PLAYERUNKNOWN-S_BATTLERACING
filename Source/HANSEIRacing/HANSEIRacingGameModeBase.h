@@ -2,17 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "HANSEIRacingGameInstance.h"
 #include "BaseGameMode.h"
+#include <sstream>
 #include "HANSEIRacingGameModeBase.generated.h"
-
-UENUM(BlueprintType)
-enum EPACKETMESSAGE {
-	PM_SIGNUP,
-	PM_LOGIN,
-	PM_CREATESESSION,
-	PM_SESSIONLIST,
-	PM_JOINSESSION
-};
 
 UCLASS()
 class HANSEIRACING_API AHANSEIRacingGameModeBase : public ABaseGameMode {
@@ -24,15 +17,21 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
-	virtual void BeginDestroy() override;
 
 public:
 	virtual void RecvDataProcessing(TCHAR* RecvMessage) override;
 
 private:
+	bool CreateSessionSucceed(std::stringstream& RecvStream);
+	void DisconnectSucceed(std::stringstream& RecvStream);
+
+private:
 	class UHANSEIRacingGameInstance* m_GameInstance;
 	class ULoginWidget* m_LoginWidget;
 	class UMainScreenWidget* m_MainWidget;
+
+private:
+	bool m_bDisconnected;
 
 public:
 	UFUNCTION(BlueprintCallable)
@@ -42,9 +41,11 @@ public:
 	UFUNCTION(BlueprintCallable)
 		void SendCreateSessionInformationToServer(const EPACKETMESSAGE& PackType, const FString& SessionName, const int32 MaxPlayer, const bool bUsePassword, const FString& Password = FString(""));
 	UFUNCTION(BlueprintCallable)
-		void SendAllSessionInformtaionToServer(const EPACKETMESSAGE& PacketType);
+		void SendAllSessionInformtaionToServer(const EPACKETMESSAGE& PacketType, const int32 MinLimit);
 	UFUNCTION(BlueprintCallable)
 		void SendJoinSessionToServer(const EPACKETMESSAGE& PacketType, const FString& SessionName, const bool bUsePassword = false, const FString& Password = "");
+	UFUNCTION(BlueprintCallable)
+		void SendDisconnectToServer(const EPACKETMESSAGE& PacketType);
 
 public:
 	UFUNCTION(BlueprintCallable)

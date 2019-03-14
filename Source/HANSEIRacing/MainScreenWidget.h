@@ -19,6 +19,18 @@ public:
 		TArray<UUserWidget*> CreateSessionLists();
 
 public:
+	UPROPERTY(BlueprintReadOnly)
+		int32 m_JoinSessionFailReason;
+	UPROPERTY(BlueprintReadWrite)
+		int32 m_CreateSessionFailedReason;
+	UPROPERTY(BlueprintReadWrite)
+		int32 m_MaxSessionCount;
+	UPROPERTY(BlueprintReadWrite)
+		int32 m_CurrentPage;
+	UPROPERTY(BlueprintReadWrite)
+		bool m_bCreateSessionFailed;
+	UPROPERTY(BlueprintReadWrite)
+		bool m_bJoinSessionFailed;
 	UPROPERTY(BlueprintReadWrite)
 		bool m_bResetList;
 	UPROPERTY(BlueprintReadWrite)
@@ -26,9 +38,10 @@ public:
 
 public:
 	void SetSessionInformation(std::stringstream& RecvStream);
+	bool SucceedJoinSession(std::stringstream& RecvStream);
+	void FailedCreateSession(const bool& bFailed, const int32& FailedReason);
 
 private:
-	int32 m_SessionCount;
 	SESSION::SessionInformation m_SessionInformations;
 
 };

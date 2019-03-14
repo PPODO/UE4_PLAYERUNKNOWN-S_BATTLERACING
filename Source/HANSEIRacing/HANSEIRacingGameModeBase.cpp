@@ -1,12 +1,13 @@
 #include "HANSEIRacingGameModeBase.h"
-#include "HANSEIRacingGameInstance.h"
-#include "SocketComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "MainScreenWidget.h"
+#include "SocketComponent.h"
 #include "LoginWidget.h"
 #include <sstream>
 
-AHANSEIRacingGameModeBase::AHANSEIRacingGameModeBase() : m_GameInstance(nullptr), m_LoginWidget(nullptr), m_MainWidget(nullptr) {
-
+AHANSEIRacingGameModeBase::AHANSEIRacingGameModeBase() : m_GameInstance(nullptr), m_LoginWidget(nullptr), m_MainWidget(nullptr), m_bDisconnected(false) {
+	m_Port = 3510;
+	m_SocketName = "LoginSocket";
 	PrimaryActorTick.bCanEverTick = true;
 }
 
@@ -19,25 +20,32 @@ void AHANSEIRacingGameModeBase::BeginPlay() {
 void AHANSEIRacingGameModeBase::Tick(float DeltaTime) {
 	ABaseGameMode::Tick(DeltaTime);
 
-}
-
-void AHANSEIRacingGameModeBase::BeginDestroy() {
-	ABaseGameMode::BeginDestroy();
-
+	if (IsInGameThread()) {
+		if (m_bDisconnected && m_GameInstance) {
+			UGameplayStatics::OpenLevel(this, "/Game/Maps/sex");
+		}
+	}
 }
 
 void AHANSEIRacingGameModeBase::RecvDataProcessing(TCHAR* RecvMessage) {
 	std::stringstream RecvStream(TCHAR_TO_ANSI(RecvMessage));
-	int32 PacketType = -1, IsSuccess = PACKET::EF_FAILED;
+	int32 PacketType = -1;
 	RecvStream >> PacketType;
 
 	switch (PacketType) {
 	case PM_SIGNUP:
-
+		if (m_LoginWidget) {
+			m_LoginWidget->SucceedSignup(RecvStream);
+		}
 		break;
 	case PM_LOGIN:
 		if (m_LoginWidget) {
-			m_LoginWidget->SuccesedLogin(RecvStream);
+			m_LoginWidget->SucceedLogin(RecvStream);
+		}
+		break;
+	case PM_CREATESESSION:
+		if (CreateSessionSucceed(RecvStream)) {
+			SendDisconnectToServer(PM_DISCONNECT);
 		}
 		break;
 	case PM_SESSIONLIST:
@@ -45,9 +53,45 @@ void AHANSEIRacingGameModeBase::RecvDataProcessing(TCHAR* RecvMessage) {
 			m_MainWidget->SetSessionInformation(RecvStream);
 		}
 		break;
-
+	case PM_JOINSESSION:
+		if (m_MainWidget && m_MainWidget->SucceedJoinSession(RecvStream)) {
+			std::string SessionName;
+			RecvStream >> SessionName;
+			if (m_GameInstance) { m_GameInstance->SetSessionName(ANSI_TO_TCHAR(SessionName.c_str())); }
+			SendDisconnectToServer(PM_DISCONNECT);
+		}
+		break;
+	case PM_DISCONNECT:
+		DisconnectSucceed(RecvStream);
+		break;
 	default:
 		break;
+	}
+}
+
+bool AHANSEIRacingGameModeBase::CreateSessionSucceed(std::stringstream& RecvStream) {
+	int32 FailedReason = -1;
+	RecvStream >> FailedReason;
+
+	switch (FailedReason) {
+	case EF_EXIST:
+	case EF_FAILED:
+		if (m_MainWidget) {
+			m_MainWidget->FailedCreateSession(true, FailedReason);
+		}
+		return false;
+	case EF_SUCCEED:
+		return true;
+	}
+	return false;
+}
+
+void AHANSEIRacingGameModeBase::DisconnectSucceed(std::stringstream& RecvStream) {
+	int32 IsFailed = -1;
+	RecvStream >> IsFailed;
+
+	if (IsFailed == EFAILED::EF_SUCCEED) {
+		m_bDisconnected = true;
 	}
 }
 
@@ -84,10 +128,10 @@ void AHANSEIRacingGameModeBase::SendCreateSessionInformationToServer(const EPACK
 	GetClientSocket()->Send(SendStream.str().c_str(), SendStream.str().length());
 }
 
-void AHANSEIRacingGameModeBase::SendAllSessionInformtaionToServer(const EPACKETMESSAGE& PacketType) {
+void AHANSEIRacingGameModeBase::SendAllSessionInformtaionToServer(const EPACKETMESSAGE& PacketType, const int32 MinLimit) {
 	std::stringstream SendStream;
 	
-	SendStream << PacketType << std::endl;
+	SendStream << PacketType << std::endl << MinLimit << std::endl;
 
 	GetClientSocket()->Send(SendStream.str().c_str(), SendStream.str().length());
 }
@@ -96,7 +140,15 @@ void AHANSEIRacingGameModeBase::SendJoinSessionToServer(const EPACKETMESSAGE& Pa
 	std::stringstream SendStream;
 
 	SendStream << PacketType << std::endl << TCHAR_TO_ANSI(*SessionName) << std::endl << bUsePassword << std::endl << TCHAR_TO_ANSI(*Password) << std::endl;
-	
+
+	GetClientSocket()->Send(SendStream.str().c_str(), SendStream.str().length());
+}
+
+void AHANSEIRacingGameModeBase::SendDisconnectToServer(const EPACKETMESSAGE& PacketType) {
+	std::stringstream SendStream;
+
+	SendStream << PacketType << std::endl;
+
 	GetClientSocket()->Send(SendStream.str().c_str(), SendStream.str().length());
 }
 

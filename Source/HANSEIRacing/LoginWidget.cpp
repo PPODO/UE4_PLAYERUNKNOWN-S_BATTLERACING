@@ -1,18 +1,26 @@
 #include "LoginWidget.h"
 #include "HANSEIRacingGameInstance.h"
-#include "Networking.h"
+#include "SocketComponent.h"
 #include "engine/Engine.h"
 
-void ULoginWidget::SuccesedLogin(std::stringstream& RecvStream) {
+void ULoginWidget::SucceedLogin(std::stringstream& RecvStream) {
 	int32 State = -1;
 	RecvStream >> State;
 
-	if (State == PACKET::EF_SUCCESSED) {
+	if (State == EF_SUCCEED) {
 		if (m_GameInstance) {
 			m_GameInstance->SetPlayerNickName(GetPlayerNickName(RecvStream));
 		}
 	}
-	m_PacketState = (EPACKETSTATE)State;
+	m_PacketState = (EFAILED)State;
+	m_bPopupWarningMessageBox = true;
+}
+
+void ULoginWidget::SucceedSignup(std::stringstream& RecvStream) {
+	int32 State = -1;
+	RecvStream >> State;
+
+	m_PacketState = (EFAILED)State;
 	m_bPopupWarningMessageBox = true;
 }
 
