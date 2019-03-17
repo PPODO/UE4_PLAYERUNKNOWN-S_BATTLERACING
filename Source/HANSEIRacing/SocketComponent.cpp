@@ -29,8 +29,12 @@ uint32 FSocketComponent::Run() {
 
 	while (m_ThreadSafeCounter.GetValue() == 0) {
 		if (m_Socket && m_GameMode && m_Address && m_Socket->GetConnectionState() != ESocketConnectionState::SCS_Connected) {
+			std::unique_lock<std::mutex> Lock(m_Lock);
 			if (m_Socket->Connect(*m_Address)) {
 				m_GameMode->SetConnected(true);
+			}
+			else {
+				m_GameMode->m_bFailedJoinGame = true;
 			}
 		}
 		else if(m_Socket && m_GameMode) {
@@ -51,22 +55,38 @@ void FSocketComponent::StopThread() {
 	Stop();
 }
 
-void FSocketComponent::Send(const ANSICHAR* Message, uint32 Length) {
+bool FSocketComponent::Send(const ANSICHAR* Message, uint32 Length) {
 	int SendBytes = 0;
-	m_Socket->Send((uint8*)Message, Length, SendBytes);
+	if (m_Socket && m_Socket->GetConnectionState() == ESocketConnectionState::SCS_Connected) {
+		return m_Socket->Send((uint8*)Message, Length, SendBytes);
+	}
+	return false;
 }
 
 void FSocketComponent::ConnectToServer(class ABaseGameMode* GM, int32 Port, const FString& SocketName) {
-	bool bIsValid = true;
+	bool bIsValid = true, bCanBind = false;
 	if (m_Socket) {
 		m_Socket->Close();
 		ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(m_Socket);
 	}
-	m_Socket = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateSocket(NAME_None, SocketName, false);
 
-	m_Address = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateInternetAddr();
-	m_Address->SetIp(L"172.30.1.15", bIsValid);
-	m_Address->SetPort(Port);
+	TSharedRef<FInternetAddr> LocalIP = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->GetLocalHostAddr(*GLog, bCanBind);
+	if (LocalIP->IsValid()) {
+		m_Address = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateInternetAddr();
+		m_Address->SetIp(*LocalIP->ToString(false), bIsValid);
+		m_Address->SetPort(Port);
+	}
+
+	m_Socket = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateSocket(NAME_None, SocketName, false);
+	if (m_Socket) {
+		if (m_Socket->Connect(*m_Address)) {
+			GM->SetConnected(true);
+		}
+		else {
+			GM->m_bFailedJoinGame = true;
+		}
+	}
+
 	if (GM) {
 		m_GameMode = GM;
 	}
@@ -92,4 +112,16 @@ SESSION::SessionInformation::SessionInformation() {
 }
 
 SESSION::SessionInformation::~SessionInformation() {
+}
+
+PLAYER::CharacterInformation::CharacterInformation() {
+}
+
+PLAYER::CharacterInformation::~CharacterInformation() {
+}
+
+PLAYER::Character::Character() {
+}
+
+PLAYER::Character::~Character() {
 }

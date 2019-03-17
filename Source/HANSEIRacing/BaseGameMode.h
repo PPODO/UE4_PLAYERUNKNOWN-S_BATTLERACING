@@ -32,6 +32,10 @@ public:
 	FORCEINLINE void SetConnected(bool b) { m_bIsConnectedToServer = b; }
 	FORCEINLINE class FSocketComponent* GetClientSocket() const { return m_Socket; }
 
+public:
+	UPROPERTY(BlueprintReadOnly)
+		bool m_bFailedJoinGame;
+
 private:
 	class UHANSEIRacingGameInstance* m_GameInstance;
 	class FSocketComponent* m_Socket;

@@ -40,7 +40,9 @@ public:
 	void ConnectToServer(class ABaseGameMode* GM, int32 Port, const FString& SocketName);
 	void DisconnectSocket();
 	void StopThread();
-	void Send(const ANSICHAR* Message, uint32 Length);
+	bool Send(const ANSICHAR* Message, uint32 Length);
+
+	ESocketConnectionState GetConnectionState() const { return m_Socket->GetConnectionState(); }
 
 };
 
@@ -53,15 +55,35 @@ namespace PACKET {
 		EJF_MAXPLAYER,
 		EJF_SUCCEED
 	};
+
+	enum EFAILED {
+		EF_FAILED,
+		EF_EXIST,
+		EF_SUCCEED
+	};
+
+	enum ELOGINFAILED {
+		ELF_WRONGID,
+		ELF_WRONGPASS,
+		ELF_FAILED,
+		ELF_SUCCEED
+	};
+
+	enum ESIGNUPFAILED {
+		ESF_EXISTNICKNAME,
+		ESF_EXISTID,
+		ESF_FAILED,
+		ESF_SUCCEED
+	};
+
+	enum ENEWSESSIONFAILED {
+		ENSF_FAILED,
+		ENSF_EXIST,
+		ENSF_SUCCEED
+	};
 }
 
 namespace GAMEPACKET {
-	enum PACKETMESSAGE {
-		PM_JOIN,
-		PM_DISCONNECT,
-		PM_COUNT
-	};
-
 	enum EJOINSTATE {
 		EJS_FAILED,
 		EJS_SUCCEDD
@@ -69,11 +91,117 @@ namespace GAMEPACKET {
 }
 
 namespace PLAYER {
-	class Character {
+	struct Vector {
+		float X, Y, Z;
 
+	public:
+		Vector() { X = 0, Y = 0, Z = 0; };
+		Vector(float _X, float _Y, float _Z) : X(_X), Y(_Y), Z(_Z) {};
+
+		friend std::ostream& operator<<(std::ostream& os, Vector& Vec) {
+			os << Vec.X << std::endl;
+			os << Vec.Y << std::endl;
+			os << Vec.Z << std::endl;
+
+			return os;
+		}
+
+		friend std::istream& operator>>(std::istream& is, Vector& Vec) {
+			is >> Vec.X;
+			is >> Vec.Y;
+			is >> Vec.Z;
+
+			return is;
+		}
+
+		inline bool operator==(const FVector& Vec2) {
+			if (FMath::IsNearlyEqual(this->X, Vec2.X) && FMath::IsNearlyEqual(this->Y, Vec2.Y) && FMath::IsNearlyEqual(this->Z, Vec2.Z)) {
+				return true;
+			}
+			return false;
+		}
+
+		inline bool operator!=(const FVector& Vec2) {
+			if (!FMath::IsNearlyEqual(this->X, Vec2.X) || !FMath::IsNearlyEqual(this->Y, Vec2.Y) || !FMath::IsNearlyEqual(this->Z, Vec2.Z)) {
+				return true;
+			}
+			return false;
+		}
+
+		inline PLAYER::Vector& operator=(const FVector& Vec2) {
+			this->X = Vec2.X;
+			this->Y = Vec2.Y;
+			this->Z = Vec2.Z;
+
+			return *this;
+		}
 	};
 
+	class Character {
+	public:
+		unsigned int m_UniqueKey;
+		std::string m_PlayerName;
+		Vector m_Location;
+		Vector m_Rotation;
 
+	public:
+		Character();
+		~Character();
+
+		friend std::ostream& operator<<(std::ostream& os, Character& Info) {
+			os << Info.m_UniqueKey << std::endl;
+			os << Info.m_PlayerName << std::endl;
+			os << Info.m_Location << std::endl;
+			os << Info.m_Rotation << std::endl;
+
+			return os;
+		}
+
+		friend std::istream& operator>>(std::istream& is, Character& Info) {
+			is >> Info.m_UniqueKey;
+			is >> Info.m_PlayerName;
+			is >> Info.m_Location;
+			is >> Info.m_Rotation;
+
+			return is;
+		}
+
+		void operator=(const Character& Char) {
+			this->m_Location = Char.m_Location;
+			this->m_PlayerName = Char.m_PlayerName;
+			this->m_Rotation = Char.m_Rotation;
+			this->m_UniqueKey = Char.m_UniqueKey;
+		}
+	};
+
+	class CharacterInformation {
+	public:
+		std::vector<Character> m_Characters;
+
+	public:
+		CharacterInformation();
+		~CharacterInformation();
+
+		friend std::ostream& operator<<(std::ostream& os, CharacterInformation& Info) {
+			for (auto Iterator : Info.m_Characters) {
+				os << Iterator << std::endl;
+			}
+			return os;
+		}
+
+		friend std::istream& operator>>(std::istream& is, CharacterInformation& Info) {
+			int32 Size = -1;
+			is >> Size;
+
+			for (int32 i = 0; i < Size; i++) {
+				Character NewCharacter;
+				is >> NewCharacter;
+
+				Info.m_Characters.push_back(NewCharacter);
+			}
+			return is;
+		}
+	};
 }
 
 namespace SESSION {

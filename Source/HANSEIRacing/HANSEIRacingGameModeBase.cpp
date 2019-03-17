@@ -55,9 +55,6 @@ void AHANSEIRacingGameModeBase::RecvDataProcessing(TCHAR* RecvMessage) {
 		break;
 	case PM_JOINSESSION:
 		if (m_MainWidget && m_MainWidget->SucceedJoinSession(RecvStream)) {
-			std::string SessionName;
-			RecvStream >> SessionName;
-			if (m_GameInstance) { m_GameInstance->SetSessionName(ANSI_TO_TCHAR(SessionName.c_str())); }
 			SendDisconnectToServer(PM_DISCONNECT);
 		}
 		break;
@@ -71,16 +68,20 @@ void AHANSEIRacingGameModeBase::RecvDataProcessing(TCHAR* RecvMessage) {
 
 bool AHANSEIRacingGameModeBase::CreateSessionSucceed(std::stringstream& RecvStream) {
 	int32 FailedReason = -1;
-	RecvStream >> FailedReason;
+	std::string SessionName;
+	RecvStream >> FailedReason >> SessionName;
 
 	switch (FailedReason) {
-	case EF_EXIST:
-	case EF_FAILED:
+	case PACKET::ENSF_EXIST:
+	case PACKET::ENSF_FAILED:
 		if (m_MainWidget) {
 			m_MainWidget->FailedCreateSession(true, FailedReason);
 		}
 		return false;
-	case EF_SUCCEED:
+	case PACKET::ENSF_SUCCEED:
+		if (m_GameInstance) {
+			m_GameInstance->SetSessionName(ANSI_TO_TCHAR(SessionName.c_str()));
+		}
 		return true;
 	}
 	return false;
@@ -102,7 +103,9 @@ void AHANSEIRacingGameModeBase::SendPlayerLoginInformationToServer(const EPACKET
 	SendStream << TCHAR_TO_ANSI(*ID) << std::endl;
 	SendStream << TCHAR_TO_ANSI(*Password) << std::endl;
 
-	GetClientSocket()->Send(SendStream.str().c_str(), SendStream.str().length());
+	if (GetClientSocket()) {
+		GetClientSocket()->Send(SendStream.str().c_str(), SendStream.str().length());
+	}
 }
 
 void AHANSEIRacingGameModeBase::SendPlayerSignUpInformationToServer(const EPACKETMESSAGE& PackType, const FString& NickName, const FString& ID, const FString& Password) {
@@ -113,7 +116,9 @@ void AHANSEIRacingGameModeBase::SendPlayerSignUpInformationToServer(const EPACKE
 	SendStream << TCHAR_TO_ANSI(*ID) << std::endl;
 	SendStream << TCHAR_TO_ANSI(*Password) << std::endl;
 
-	GetClientSocket()->Send(SendStream.str().c_str(), SendStream.str().length());
+	if (GetClientSocket()) {
+		GetClientSocket()->Send(SendStream.str().c_str(), SendStream.str().length());
+	}
 }
 
 void AHANSEIRacingGameModeBase::SendCreateSessionInformationToServer(const EPACKETMESSAGE & PackType, const FString & SessionName, const int32 MaxPlayer, const bool bUsePassword, const FString & Password) {
@@ -125,7 +130,9 @@ void AHANSEIRacingGameModeBase::SendCreateSessionInformationToServer(const EPACK
 	SendStream << bUsePassword << std::endl;
 	SendStream << TCHAR_TO_ANSI(*Password) << std::endl;
 
-	GetClientSocket()->Send(SendStream.str().c_str(), SendStream.str().length());
+	if (GetClientSocket()) {
+		GetClientSocket()->Send(SendStream.str().c_str(), SendStream.str().length());
+	}
 }
 
 void AHANSEIRacingGameModeBase::SendAllSessionInformtaionToServer(const EPACKETMESSAGE& PacketType, const int32 MinLimit) {
@@ -133,7 +140,9 @@ void AHANSEIRacingGameModeBase::SendAllSessionInformtaionToServer(const EPACKETM
 	
 	SendStream << PacketType << std::endl << MinLimit << std::endl;
 
-	GetClientSocket()->Send(SendStream.str().c_str(), SendStream.str().length());
+	if (GetClientSocket()) {
+		GetClientSocket()->Send(SendStream.str().c_str(), SendStream.str().length());
+	}
 }
 
 void AHANSEIRacingGameModeBase::SendJoinSessionToServer(const EPACKETMESSAGE& PacketType, const FString & SessionName, const bool bUsePassword, const FString & Password) {
@@ -141,7 +150,9 @@ void AHANSEIRacingGameModeBase::SendJoinSessionToServer(const EPACKETMESSAGE& Pa
 
 	SendStream << PacketType << std::endl << TCHAR_TO_ANSI(*SessionName) << std::endl << bUsePassword << std::endl << TCHAR_TO_ANSI(*Password) << std::endl;
 
-	GetClientSocket()->Send(SendStream.str().c_str(), SendStream.str().length());
+	if (GetClientSocket()) {
+		GetClientSocket()->Send(SendStream.str().c_str(), SendStream.str().length());
+	}
 }
 
 void AHANSEIRacingGameModeBase::SendDisconnectToServer(const EPACKETMESSAGE& PacketType) {
@@ -149,7 +160,9 @@ void AHANSEIRacingGameModeBase::SendDisconnectToServer(const EPACKETMESSAGE& Pac
 
 	SendStream << PacketType << std::endl;
 
-	GetClientSocket()->Send(SendStream.str().c_str(), SendStream.str().length());
+	if (GetClientSocket()) {
+		GetClientSocket()->Send(SendStream.str().c_str(), SendStream.str().length());
+	}
 }
 
 void AHANSEIRacingGameModeBase::SetLoginWidgetClass(UUserWidget* Widget) {

@@ -2,7 +2,7 @@
 #include "SocketComponent.h"
 #include "HANSEIRacingGameInstance.h"
 
-ABaseGameMode::ABaseGameMode() : m_GameInstance(nullptr), m_Socket(nullptr) {
+ABaseGameMode::ABaseGameMode() : m_GameInstance(nullptr), m_Socket(nullptr), m_bFailedJoinGame(false) {
 	PrimaryActorTick.bCanEverTick = true;
 }
 

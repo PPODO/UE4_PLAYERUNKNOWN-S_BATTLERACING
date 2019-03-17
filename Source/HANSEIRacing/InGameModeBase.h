@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "SocketComponent.h"
 #include "BaseGameMode.h"
 #include <sstream>
 #include "InGameModeBase.generated.h"
@@ -22,20 +23,38 @@ protected:
 public:
 	virtual void RecvDataProcessing(TCHAR* RecvMessage);
 
+public:
+	void SendPlayerLocationAndRotation(const PLAYER::Vector& Location, const PLAYER::Vector& Rotation);
+
+public:
+	UFUNCTION(BlueprintCallable)
+		void SendDisconnect();
+
+public:
+	UPROPERTY(BlueprintReadOnly)
+		bool m_bSpawned;
+
 private:
 	void IsSucceedJoinSession(std::stringstream&);
-	void SendDisconnect();
+	bool SendMessageToServerAboutConnectState(const FString& SessionName, const FString& NickName, uint32 UniqueKey);
+	void DisconnectOtherPlayer(std::stringstream&);
+	void UpdateCharacterInformation(std::stringstream&);
 
 private:
 	void SpawnCharacter();
+	void UpdatePlayerLocationAndRotation();
 
 private:
-	class APlayerController* m_PlayerController;
+	class AHANSEIRacginPlayerController* m_PlayerController;
 	class UHANSEIRacingGameInstance* m_GameInstance;
 	TArray<AActor*> m_SpawnPoints;
+	TMap<uint32, class ADefaultCharacter*> m_Players;
 
 private:
-	bool m_bSpawnNewPlayer;
 	APawn* m_MyCharacter;
+	bool m_bSpawnNewPlayer;
+
+private:
+	PLAYER::CharacterInformation m_PlayersInformation;
 	
 };

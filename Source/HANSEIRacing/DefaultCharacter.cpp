@@ -1,29 +1,38 @@
 #include "DefaultCharacter.h"
-#include "ConstructorHelpers.h"
 #include "HANSEIRacginPlayerController.h"
 #include "Components/StaticMeshComponent.h"
-#include "Components/InputComponent.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "Camera/CameraComponent.h"
+#include "ConstructorHelpers.h"
+#include "Engine/World.h"
 
-ADefaultCharacter::ADefaultCharacter() : m_PlayerController(false) {
+ADefaultCharacter::ADefaultCharacter() {
 	ConstructorHelpers::FObjectFinder<UStaticMesh> MeshObject(L"StaticMesh'/Engine/BasicShapes/Cube.Cube'");
 
-	if (MeshObject.Succeeded()) {
-		m_PawnMesh = CreateDefaultSubobject<UStaticMeshComponent>(L"Pawn Mesh Component");
-		m_PawnMesh->SetStaticMesh(MeshObject.Object);
+	if (MeshObject.Object) {
+		m_Mesh = CreateDefaultSubobject<UStaticMeshComponent>("Mesh Component");
+		m_Mesh->SetStaticMesh(MeshObject.Object);
+		m_Mesh->SetRelativeLocation(FVector(0.f));
+		m_Mesh->SetRelativeRotation(FRotator(0.f));
+		m_Mesh->AttachTo(RootComponent);
 	}
-
+	
 	PrimaryActorTick.bCanEverTick = true;
 }
 
 void ADefaultCharacter::BeginPlay() {
 	Super::BeginPlay();
 
+	GetWorld()->GetTimerManager();
 }
 
 void ADefaultCharacter::PossessedBy(AController* NewController) {
 	Super::PossessedBy(NewController);
 
-	m_PlayerController = Cast<AHANSEIRacginPlayerController>(NewController);
+	m_Controller = Cast<AHANSEIRacginPlayerController>(NewController);
+	if (!m_Controller) {
+		m_Controller = Cast<AHANSEIRacginPlayerController>(NewController);
+	}
 }
 
 void ADefaultCharacter::Tick(float DeltaTime) {
@@ -34,30 +43,38 @@ void ADefaultCharacter::Tick(float DeltaTime) {
 void ADefaultCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
-	PlayerInputComponent->BindAction("PauseUI", IE_Pressed, this, &ADefaultCharacter::TogglePauseUI);
-
 	PlayerInputComponent->BindAxis("Forward", this, &ADefaultCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("Right", this, &ADefaultCharacter::MoveRight);
+	PlayerInputComponent->BindAxis("TurnRate", this, &ADefaultCharacter::TurnRate);
+	PlayerInputComponent->BindAxis("LookAtRate", this, &ADefaultCharacter::LookAtRate);
 }
 
 void ADefaultCharacter::MoveForward(float Value) {
+	if (Value != 0.f) {
+		const FRotator YawRotation(0.f, Controller->GetControlRotation().Yaw, 0.f);
+		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 
+		AddMovementInput(Direction, Value);
+	}
 }
 
 void ADefaultCharacter::MoveRight(float Value) {
-	
+	if (Value != 0.f) {
+		const FRotator YawRotation(0.f, Controller->GetControlRotation().Yaw, 0.f);
+		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+
+		AddMovementInput(Direction, Value);
+	}
 }
 
-void ADefaultCharacter::TogglePauseUI() {
-	if (m_PlayerController) {
-		m_PlayerController->SetVisiblePauseUI(!m_PlayerController->GetVisiblePauseUI());
-		m_PlayerController->bShowMouseCursor = m_PlayerController->GetVisiblePauseUI();
+void ADefaultCharacter::TurnRate(float Value) {
+	if (Value != 0.f) {
+		AddControllerYawInput(Value);
+	}
+}
 
-		if (m_PlayerController->GetVisiblePauseUI()) {
-			m_PlayerController->SetInputMode(FInputModeGameAndUI());
-		}
-		else {
-			m_PlayerController->SetInputMode(FInputModeGameOnly());
-		}
+void ADefaultCharacter::LookAtRate(float Value) {
+	if (Value != 0.f) {
+		AddControllerPitchInput(Value);
 	}
 }

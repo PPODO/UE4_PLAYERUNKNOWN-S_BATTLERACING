@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "SocketComponent.h"
 #include "HANSEIRacginPlayerController.generated.h"
 
 UCLASS()
@@ -12,13 +13,28 @@ class HANSEIRACING_API AHANSEIRacginPlayerController : public APlayerController
 public:
 	AHANSEIRacginPlayerController();
 
+protected:
+	virtual void BeginPlay() override;
+	virtual void BeginDestroy() override;
+
 public:
-	UFUNCTION(BlueprintCallable)
-		FORCEINLINE bool GetVisiblePauseUI() const { return m_bVisiblePauseUI; }
-	UFUNCTION(BlueprintCallable)
-		void SetVisiblePauseUI(bool b) { m_bVisiblePauseUI = b; }
+	virtual void Possess(class APawn* Pawn);
+
+
+public:
+	void LocationSendTimerStart(class AGameModeBase* GM);
 
 private:
-	bool m_bVisiblePauseUI;
+	UFUNCTION()
+		void IsItNearlyEqualLocationAndRotation();
+
+private:
+	class ACharacter* m_Character;
+	class AInGameModeBase* m_GameMode;
+
+private:
+	FTimerHandle m_TimerHandle;
+	PLAYER::Vector Location;
+	PLAYER::Vector Rotation;
 
 };

@@ -25,8 +25,13 @@ void UMainScreenWidget::SetSessionInformation(std::stringstream& RecvStream) {
 }
 
 bool UMainScreenWidget::SucceedJoinSession(std::stringstream& RecvStream) {
+	std::string SessionName;
 	int32 Reason = PACKET::EJF_NONE;
-	RecvStream >> Reason;
+	RecvStream >> Reason >> SessionName;
+
+	if (Cast<UHANSEIRacingGameInstance>(GetGameInstance())) {
+		Cast<UHANSEIRacingGameInstance>(GetGameInstance())->SetSessionName(ANSI_TO_TCHAR(SessionName.c_str()));
+	}
 
 	m_JoinSessionFailReason = Reason;
 	if (m_JoinSessionFailReason != PACKET::EJF_SUCCEED) {
