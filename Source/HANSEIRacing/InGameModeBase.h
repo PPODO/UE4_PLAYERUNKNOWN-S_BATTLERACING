@@ -5,6 +5,7 @@
 #include "SocketComponent.h"
 #include "BaseGameMode.h"
 #include <sstream>
+#include <mutex>
 #include "InGameModeBase.generated.h"
 
 UCLASS()
@@ -36,7 +37,8 @@ public:
 
 private:
 	void IsSucceedJoinSession(std::stringstream&);
-	bool SendMessageToServerAboutConnectState(const FString& SessionName, const FString& NickName, uint32 UniqueKey);
+	void IsSucceedJoinOtherPlayer(std::stringstream&);
+	bool SendMessageToServerAboutConnectState(const FString& SessionName, const FString& NickName);
 	void DisconnectOtherPlayer(std::stringstream&);
 	void UpdateCharacterInformation(std::stringstream&);
 
@@ -56,5 +58,6 @@ private:
 
 private:
 	PLAYER::CharacterInformation m_PlayersInformation;
+	std::mutex m_Lock;
 	
 };

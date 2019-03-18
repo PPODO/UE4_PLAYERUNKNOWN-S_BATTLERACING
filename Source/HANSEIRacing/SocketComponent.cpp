@@ -70,12 +70,9 @@ void FSocketComponent::ConnectToServer(class ABaseGameMode* GM, int32 Port, cons
 		ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(m_Socket);
 	}
 
-	TSharedRef<FInternetAddr> LocalIP = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->GetLocalHostAddr(*GLog, bCanBind);
-	if (LocalIP->IsValid()) {
-		m_Address = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateInternetAddr();
-		m_Address->SetIp(*LocalIP->ToString(false), bIsValid);
-		m_Address->SetPort(Port);
-	}
+	m_Address = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateInternetAddr();
+	m_Address->SetIp(L"192.168.1.73", bIsValid);
+	m_Address->SetPort(Port);
 
 	m_Socket = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateSocket(NAME_None, SocketName, false);
 	if (m_Socket) {
@@ -97,6 +94,7 @@ void FSocketComponent::DisconnectSocket() {
 	if (m_Socket && m_Socket->GetConnectionState() == ESocketConnectionState::SCS_Connected) {
 		if (m_Socket->Shutdown(ESocketShutdownMode::ReadWrite) && m_Socket->Close()) {
 			ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(m_Socket);
+			m_Address = nullptr;
 			m_GameMode = nullptr;
 		}
 	}

@@ -48,11 +48,14 @@ private:
 	FString m_PlayerNickName;
 	FString m_SessionName;
 	bool m_bIsLogined;
+	int32 m_UniqueKey;
 
 public:
 	FORCEINLINE void SetPlayerNickName(const FString& NickName) { m_PlayerNickName = NickName; }
 	FORCEINLINE void SetSessionName(const FString& Name) { m_SessionName = Name; }
 	FORCEINLINE void SetIsLogined(const bool b) { m_bIsLogined = b; }
+	FORCEINLINE void SetUniqueKey(int32 Key) { m_UniqueKey = Key; }
+	FORCEINLINE int32 GetUniqueKey() const { return m_UniqueKey; }
 
 public:
 	FORCEINLINE FString GetSessionName() const { return m_SessionName; }

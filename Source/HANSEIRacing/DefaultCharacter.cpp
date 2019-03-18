@@ -6,7 +6,7 @@
 #include "ConstructorHelpers.h"
 #include "Engine/World.h"
 
-ADefaultCharacter::ADefaultCharacter() {
+ADefaultCharacter::ADefaultCharacter() : m_bIsDisconnect(false) {
 	ConstructorHelpers::FObjectFinder<UStaticMesh> MeshObject(L"StaticMesh'/Engine/BasicShapes/Cube.Cube'");
 
 	if (MeshObject.Object) {
@@ -23,7 +23,6 @@ ADefaultCharacter::ADefaultCharacter() {
 void ADefaultCharacter::BeginPlay() {
 	Super::BeginPlay();
 
-	GetWorld()->GetTimerManager();
 }
 
 void ADefaultCharacter::PossessedBy(AController* NewController) {
@@ -38,6 +37,9 @@ void ADefaultCharacter::PossessedBy(AController* NewController) {
 void ADefaultCharacter::Tick(float DeltaTime) {
 	Super::Tick(DeltaTime);
 
+	if (m_bIsDisconnect) {
+		Destroy();
+	}
 }
 
 void ADefaultCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) {

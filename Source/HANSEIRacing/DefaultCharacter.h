@@ -18,6 +18,9 @@ protected:
 	virtual void PossessedBy(class AController* NewController) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+public:
+	FORCEINLINE void SetIsDisconnect(bool b) { m_bIsDisconnect = b; }
+
 private:
 	UFUNCTION()
 		void MoveForward(float Value);
@@ -34,5 +37,6 @@ private:
 
 private:
 	class AHANSEIRacginPlayerController* m_Controller;
+	bool m_bIsDisconnect;
 
 };
