@@ -1,15 +1,55 @@
 #pragma once
+#define _CRT_SRCURE_NO_WARNINGS
 
 #include "Sockets.h"
 #include "CoreMinimal.h"
 #include "RunnableThread.h"
+#include "UdpSocketReceiver.h"
+#include "BaseGameMode.h"
 #include "Runnable.h"
 #include <iostream>
 #include <sstream>
+#include <string>
 #include <vector>
 #include <mutex>
 
 static const int32 MaxBufferSize = 1024;
+static const int32 MaxNameLen = 15;
+
+struct FInputMotionData {
+public:
+	float m_Steering;
+	float m_Throttle;
+	bool m_HandBreak;
+
+	FInputMotionData() : m_Steering(0.f), m_Throttle(0.f), m_HandBreak(false) {};
+	FInputMotionData(float& Steering, float Throttle, bool HandBreak) : m_Steering(Steering), m_Throttle(Throttle), m_HandBreak(HandBreak) {};
+};
+
+FORCEINLINE FArchive& operator<<(FArchive &Ar, FInputMotionData& TheStruct) {
+	Ar << TheStruct.m_Steering;
+	Ar << TheStruct.m_Throttle;
+	Ar << TheStruct.m_HandBreak;
+
+	return Ar;
+}
+
+class HANSEIRACING_API FUDPSocketComponent {
+private:
+	FSocket* m_Socket;
+	FUdpSocketReceiver* m_UDPReceiver;
+
+public:
+	FUDPSocketComponent();
+	~FUDPSocketComponent();
+
+public:
+	bool StartUDPReceiver();
+
+public:
+	inline FUdpSocketReceiver* GetUDPReceiver() const { return m_UDPReceiver; }
+
+};
 
 class HANSEIRACING_API FSocketComponent : public FRunnable {
 private:
@@ -43,232 +83,72 @@ public:
 	bool Send(const ANSICHAR* Message, uint32 Length);
 
 	ESocketConnectionState GetConnectionState() const { return m_Socket->GetConnectionState(); }
+	FSocket* GetSocket() const { return m_Socket; }
 
 };
 
-namespace PACKET {
-	enum EJOINFAILED {
-		EJF_NONE = -1,
-		EJF_FAILED,
-		EJF_INVALIDSESSION,
-		EJF_WRONGPASS,
-		EJF_MAXPLAYER,
-		EJF_SUCCEED
-	};
+class Session {
+public:
+	int m_SessionID;
+	std::string m_SesisonName;
+	int m_MaxPlayer;
+	bool m_bUsePassword;
+	std::string m_Password;
+	int m_CurrentPlayer;
+	bool m_GameState;
 
-	enum EFAILED {
-		EF_FAILED,
-		EF_EXIST,
-		EF_SUCCEED
-	};
+public:
+	Session() : m_SessionID(-1), m_SesisonName(""), m_MaxPlayer(0), m_bUsePassword(false), m_Password(""), m_CurrentPlayer(0), m_GameState(false) {};
 
-	enum ELOGINFAILED {
-		ELF_WRONGID,
-		ELF_WRONGPASS,
-		ELF_FAILED,
-		ELF_SUCCEED
-	};
+public:
+	friend std::ostream& operator<<(std::ostream& os, Session& Info) {
+		os << Info.m_SessionID << std::endl;
+		os << Info.m_SesisonName << std::endl;
+		os << Info.m_MaxPlayer << std::endl;
+		os << Info.m_bUsePassword << std::endl;
+		os << Info.m_Password << std::endl;
+		os << Info.m_CurrentPlayer << std::endl;
+		os << Info.m_GameState << std::endl;
 
-	enum ESIGNUPFAILED {
-		ESF_EXISTNICKNAME,
-		ESF_EXISTID,
-		ESF_FAILED,
-		ESF_SUCCEED
-	};
+		return os;
+	}
 
-	enum ENEWSESSIONFAILED {
-		ENSF_FAILED,
-		ENSF_EXIST,
-		ENSF_SUCCEED
-	};
-}
+	friend std::istream& operator>>(std::istream& is, Session& Info) {
+		is >> Info.m_SessionID;
+		is >> Info.m_SesisonName;
+		is >> Info.m_MaxPlayer;
+		is >> Info.m_bUsePassword;
+		is >> Info.m_Password;
+		is >> Info.m_CurrentPlayer;
+		is >> Info.m_GameState;
 
-namespace GAMEPACKET {
-	enum EJOINSTATE {
-		EJS_FAILED,
-		EJS_SUCCEDD
-	};
-}
+		return is;
+	}
+};
 
-namespace PLAYER {
-	struct Vector {
-		float X, Y, Z;
+class SessionInformation {
+public:
+	std::vector<Session> m_Sessions;
 
-	public:
-		Vector() { X = 0, Y = 0, Z = 0; };
-		Vector(float _X, float _Y, float _Z) : X(_X), Y(_Y), Z(_Z) {};
-
-		friend std::ostream& operator<<(std::ostream& os, Vector& Vec) {
-			os << Vec.X << std::endl;
-			os << Vec.Y << std::endl;
-			os << Vec.Z << std::endl;
-
-			return os;
+public:
+	friend std::ostream& operator<<(std::ostream& os, SessionInformation& Information) {
+		for (auto It : Information.m_Sessions) {
+			os << It;
 		}
 
-		friend std::istream& operator>>(std::istream& is, Vector& Vec) {
-			is >> Vec.X;
-			is >> Vec.Y;
-			is >> Vec.Z;
+		return os;
+	}
 
-			return is;
+	friend std::istream& operator>>(std::istream& is, SessionInformation& Information) {
+		size_t Count = 0;
+		is >> Count;
+
+		for (size_t i = 0; i < Count; i++) {
+			Session NewSession;
+			is >> NewSession;
+			Information.m_Sessions.push_back(NewSession);
 		}
+		return is;
+	}
 
-		inline bool operator==(const FVector& Vec2) {
-			if (FMath::IsNearlyEqual(this->X, Vec2.X) && FMath::IsNearlyEqual(this->Y, Vec2.Y) && FMath::IsNearlyEqual(this->Z, Vec2.Z)) {
-				return true;
-			}
-			return false;
-		}
-
-		inline bool operator!=(const FVector& Vec2) {
-			if (!FMath::IsNearlyEqual(this->X, Vec2.X) || !FMath::IsNearlyEqual(this->Y, Vec2.Y) || !FMath::IsNearlyEqual(this->Z, Vec2.Z)) {
-				return true;
-			}
-			return false;
-		}
-
-		inline PLAYER::Vector& operator=(const FVector& Vec2) {
-			this->X = Vec2.X;
-			this->Y = Vec2.Y;
-			this->Z = Vec2.Z;
-
-			return *this;
-		}
-	};
-
-	class Character {
-	public:
-		unsigned int m_UniqueKey;
-		std::string m_PlayerName;
-		Vector m_Location;
-		Vector m_Rotation;
-
-	public:
-		Character();
-		~Character();
-
-		friend std::ostream& operator<<(std::ostream& os, Character& Info) {
-			os << Info.m_UniqueKey << std::endl;
-			os << Info.m_PlayerName << std::endl;
-			os << Info.m_Location << std::endl;
-			os << Info.m_Rotation << std::endl;
-
-			return os;
-		}
-
-		friend std::istream& operator>>(std::istream& is, Character& Info) {
-			is >> Info.m_UniqueKey;
-			is >> Info.m_PlayerName;
-			is >> Info.m_Location;
-			is >> Info.m_Rotation;
-
-			return is;
-		}
-
-		void operator=(const Character& Char) {
-			this->m_Location = Char.m_Location;
-			this->m_PlayerName = Char.m_PlayerName;
-			this->m_Rotation = Char.m_Rotation;
-			this->m_UniqueKey = Char.m_UniqueKey;
-		}
-	};
-
-	class CharacterInformation {
-	public:
-		std::vector<Character> m_Characters;
-
-	public:
-		CharacterInformation();
-		~CharacterInformation();
-
-		friend std::ostream& operator<<(std::ostream& os, CharacterInformation& Info) {
-			for (auto Iterator : Info.m_Characters) {
-				os << Iterator << std::endl;
-			}
-			return os;
-		}
-
-		friend std::istream& operator>>(std::istream& is, CharacterInformation& Info) {
-			int32 Size = -1;
-			is >> Size;
-
-			for (int32 i = 0; i < Size; i++) {
-				Character NewCharacter;
-				is >> NewCharacter;
-
-				Info.m_Characters.push_back(NewCharacter);
-			}
-			return is;
-		}
-	};
-}
-
-namespace SESSION {
-	enum GAMESTATE { LOBBY, INGAME };
-
-	class Session {
-	public:
-		std::string m_SessionName;
-		int m_MaxPlayer;
-		bool m_bUsePassword;
-		std::string m_Password;
-		int m_CurrentPlayer;
-		int m_GameState;
-
-	public:
-		Session();
-		~Session();
-
-		friend std::ostream& operator<<(std::ostream& os, Session& Info) {
-			os << Info.m_SessionName << std::endl;
-			os << Info.m_MaxPlayer << std::endl;
-			os << Info.m_bUsePassword << std::endl;
-			os << Info.m_Password << std::endl;
-			os << Info.m_CurrentPlayer << std::endl;
-			os << Info.m_GameState << std::endl;
-
-			return os;
-		}
-
-		friend std::istream& operator>>(std::istream& is, Session& Info) {
-			is >> Info.m_SessionName;
-			is >> Info.m_MaxPlayer;
-			is >> Info.m_bUsePassword;
-			is >> Info.m_Password;
-			is >> Info.m_CurrentPlayer;
-			is >> Info.m_GameState;
-
-			return is;
-		}
-
-	};
-
-	class SessionInformation {
-	public:
-		std::vector<Session> m_Sessions;
-
-	public:
-		SessionInformation();
-		~SessionInformation();
-
-		friend std::ostream& operator<<(std::ostream& os, SessionInformation& Info) {
-			for (auto Iterator : Info.m_Sessions) {
-				os << Iterator;
-			}
-			return os;
-		}
-
-		friend std::istream& operator>>(std::istream& is, SessionInformation& Info) {
-			size_t Size = 0;
-			is >> Size;
-
-			for (size_t i = 0; i < Size; i++) {
-				Session NewSession;
-				is >> NewSession;
-				Info.m_Sessions.push_back(NewSession);
-			}
-			return is;
-		}
-	};
-}
+};

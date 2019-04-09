@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include <sstream>
+#include "LoginGameMode.h"
 #include "LoginWidget.generated.h"
 
 UCLASS()
@@ -11,22 +11,20 @@ class HANSEIRACING_API ULoginWidget : public UUserWidget
 	GENERATED_BODY()
 
 private:
-	FString GetPlayerNickName(std::stringstream& RecvStream);
-
-public:
-	void SucceedLogin(std::stringstream& RecvStream);
-	void SucceedSignup(std::stringstream& RecvStream);
+	ALoginGameMode* m_GameMode;
 
 public:
 	UPROPERTY(BlueprintReadWrite)
-		class UHANSEIRacingGameInstance* m_GameInstance;
-	UPROPERTY(BlueprintReadWrite)
-		int32 m_PacketState = -1;
-	UPROPERTY(BlueprintReadWrite)
-		bool m_bPopupWarningMessageBox = false;
+		bool m_bIsPopup = false;
 
-private:
-	
+	UPROPERTY(BlueprintReadWrite)
+		EPACKETFAILEDTYPE m_FailedReason;
 
+public:
+	void SetPopUp(const bool& Value, const EPACKETFAILEDTYPE& FailedReason) { m_bIsPopup = Value, m_FailedReason = FailedReason; }
+
+public:
+	UFUNCTION(BlueprintCallable)
+		void SetGameMode(AGameModeBase* GM) { m_GameMode = Cast<ALoginGameMode>(GM); }
 	
 };

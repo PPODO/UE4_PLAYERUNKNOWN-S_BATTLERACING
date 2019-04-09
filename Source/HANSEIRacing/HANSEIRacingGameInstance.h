@@ -4,34 +4,6 @@
 #include "Engine/GameInstance.h"
 #include "HANSEIRacingGameInstance.generated.h"
 
-UENUM(BlueprintType)
-enum EPACKETMESSAGE {
-	PM_SIGNUP,
-	PM_LOGIN,
-	PM_CREATESESSION,
-	PM_SESSIONLIST,
-	PM_JOINSESSION,
-	PM_DISCONNECT
-};
-
-UENUM(BlueprintType)
-enum EFAILED {
-	EF_EXIST,
-	EF_FAILED,
-	EF_SUCCEED
-};
-
-UENUM(BlueprintType)
-enum EGAMEPACKETMESSAGE {
-	PGM_JOIN,
-	PGM_DISCONNECT,
-	PGM_UPDATE,
-
-	PGM_DISCONNECTOTHER,
-	PGM_NEWPLAYER,
-	PGM_COUNT
-};
-
 UCLASS()
 class HANSEIRACING_API UHANSEIRacingGameInstance : public UGameInstance
 {
@@ -45,6 +17,7 @@ protected:
 	virtual void Shutdown() override;
 
 private:
+	int32 m_SessionID;
 	FString m_PlayerNickName;
 	FString m_SessionName;
 	bool m_bIsLogined;
@@ -55,10 +28,12 @@ public:
 	FORCEINLINE void SetSessionName(const FString& Name) { m_SessionName = Name; }
 	FORCEINLINE void SetIsLogined(const bool b) { m_bIsLogined = b; }
 	FORCEINLINE void SetUniqueKey(int32 Key) { m_UniqueKey = Key; }
-	FORCEINLINE int32 GetUniqueKey() const { return m_UniqueKey; }
+	FORCEINLINE void SetSessionID(const int32 ID) { m_SessionID = ID; }
 
 public:
 	FORCEINLINE FString GetSessionName() const { return m_SessionName; }
+	FORCEINLINE int32 GetUniqueKey() const { return m_UniqueKey; }
+	FORCEINLINE int32 GetSessionID() const { return m_SessionID; }
 
 public:
 	UFUNCTION(BlueprintCallable)

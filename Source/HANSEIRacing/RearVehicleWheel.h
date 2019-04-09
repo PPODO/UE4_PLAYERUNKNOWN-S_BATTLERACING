@@ -8,5 +8,8 @@ UCLASS()
 class HANSEIRACING_API URearVehicleWheel : public UVehicleWheel
 {
 	GENERATED_BODY()
+
+public:
+	URearVehicleWheel();
 	
 };

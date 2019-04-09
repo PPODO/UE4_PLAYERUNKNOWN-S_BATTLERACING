@@ -1,7 +1,7 @@
 #include "SocketComponent.h"
+#include "UdpSocketBuilder.h"
 #include "SocketSubsystem.h"
 #include "PlatformProcess.h"
-#include "BaseGameMode.h"
 #include "IPAddress.h"
 
 FSocketComponent::FSocketComponent() : m_GameMode(nullptr), m_ThreadSafeCounter(0), m_Socket(nullptr), m_Address(nullptr) {
@@ -29,17 +29,11 @@ uint32 FSocketComponent::Run() {
 
 	while (m_ThreadSafeCounter.GetValue() == 0) {
 		if (m_Socket && m_GameMode && m_Address && m_Socket->GetConnectionState() != ESocketConnectionState::SCS_Connected) {
-			std::unique_lock<std::mutex> Lock(m_Lock);
-			if (m_Socket->Connect(*m_Address)) {
-				m_GameMode->SetConnected(true);
-			}
-			else {
-				m_GameMode->m_bFailedJoinGame = true;
-			}
+			m_Socket->Connect(*m_Address);
 		}
 		else if(m_Socket && m_GameMode) {
 			if (m_Socket->HasPendingData(PendingData) && m_Socket->Recv((uint8*)MessageBuffer, MaxBufferSize, RecvBytes)) {
-				m_GameMode->RecvDataProcessing(UTF8_TO_TCHAR(MessageBuffer));
+				m_GameMode->RecvDataProcessing(MessageBuffer);
 				memset(MessageBuffer, 0, MaxBufferSize);
 			}
 		}
@@ -71,17 +65,12 @@ void FSocketComponent::ConnectToServer(class ABaseGameMode* GM, int32 Port, cons
 	}
 
 	m_Address = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateInternetAddr();
-	m_Address->SetIp(L"192.168.1.73", bIsValid);
+	m_Address->SetIp(L"172.30.1.15", bIsValid);
 	m_Address->SetPort(Port);
 
 	m_Socket = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateSocket(NAME_None, SocketName, false);
 	if (m_Socket) {
-		if (m_Socket->Connect(*m_Address)) {
-			GM->SetConnected(true);
-		}
-		else {
-			GM->m_bFailedJoinGame = true;
-		}
+		m_Socket->Connect(*m_Address);
 	}
 
 	if (GM) {
@@ -100,26 +89,34 @@ void FSocketComponent::DisconnectSocket() {
 	}
 }
 
-SESSION::Session::Session() {
+FUDPSocketComponent::FUDPSocketComponent() : m_UDPReceiver(nullptr), m_Socket(nullptr) {
 }
 
-SESSION::Session::~Session() {
+FUDPSocketComponent::~FUDPSocketComponent() {
+	if (m_UDPReceiver) {
+		delete m_UDPReceiver;
+		m_UDPReceiver = nullptr;
+	}
+
+	if (m_Socket) {
+		m_Socket->Close();
+		ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(m_Socket);
+	}
 }
 
-SESSION::SessionInformation::SessionInformation() {
-}
+bool FUDPSocketComponent::StartUDPReceiver() {
+	bool bCanBind = false;
+	auto Addr = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->GetLocalHostAddr(*GLog, bCanBind);
 
-SESSION::SessionInformation::~SessionInformation() {
-}
+	if (Addr->IsValid()) {
+		FIPv4Address Address;
+		FIPv4Address::Parse(Addr->ToString(false), Address);
+		FIPv4Endpoint EndPoint(Address, 3515);
+		FTimespan ThreadWaitTime = FTimespan::FromMilliseconds(100);
 
-PLAYER::CharacterInformation::CharacterInformation() {
-}
-
-PLAYER::CharacterInformation::~CharacterInformation() {
-}
-
-PLAYER::Character::Character() {
-}
-
-PLAYER::Character::~Character() {
+		m_Socket = FUdpSocketBuilder(L"Controller Socket").AsNonBlocking().AsReusable().BoundToEndpoint(EndPoint).WithReceiveBufferSize(MaxBufferSize);
+		m_UDPReceiver = new FUdpSocketReceiver(m_Socket, ThreadWaitTime, L"UDP Socket Receiver");
+		return true;
+	}
+	return false;
 }

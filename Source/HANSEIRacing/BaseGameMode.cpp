@@ -1,17 +1,18 @@
 #include "BaseGameMode.h"
-#include "SocketComponent.h"
-#include "HANSEIRacingGameInstance.h"
 
-ABaseGameMode::ABaseGameMode() : m_GameInstance(nullptr), m_Socket(nullptr), m_bFailedJoinGame(false) {
+ABaseGameMode::ABaseGameMode() : m_Socket(nullptr), m_bIsConnected(false) {
+
 	PrimaryActorTick.bCanEverTick = true;
 }
 
 void ABaseGameMode::BeginPlay() {
 	Super::BeginPlay();
 
-	m_GameInstance = Cast<UHANSEIRacingGameInstance>(GetGameInstance());
 	m_Socket = new FSocketComponent;
-	if (m_Socket) {
+	if (!m_Socket) {
+		m_Socket = new FSocketComponent;
+	}
+	else {
 		m_Socket->ConnectToServer(this, m_Port, m_SocketName);
 	}
 }
@@ -19,6 +20,9 @@ void ABaseGameMode::BeginPlay() {
 void ABaseGameMode::Tick(float DeltaTime) {
 	Super::Tick(DeltaTime);
 
+	if (m_Socket && m_bIsConnected != (m_Socket->GetConnectionState() != ESocketConnectionState::SCS_Connected ? false : true)) {
+		m_bIsConnected = (m_Socket->GetConnectionState() != ESocketConnectionState::SCS_Connected ? false : true);
+	}
 }
 
 void ABaseGameMode::BeginDestroy() {
@@ -31,6 +35,5 @@ void ABaseGameMode::BeginDestroy() {
 	}
 }
 
-void ABaseGameMode::RecvDataProcessing(TCHAR* RecvMessage) {
-	
+void ABaseGameMode::RecvDataProcessing(uint8 * RecvBuffer) {
 }

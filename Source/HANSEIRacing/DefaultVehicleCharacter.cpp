@@ -1,6 +1,8 @@
 #include "DefaultVehicleCharacter.h"
 #include "FrontVehicleWheel.h"
 #include "RearVehicleWheel.h"
+#include "HANSEIRacingController.h"
+#include "WheeledVehicleMovementComponent.h"
 #include "WheeledVehicleMovementComponent4W.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -8,17 +10,18 @@
 #include "Camera/CameraComponent.h"
 #include "ConstructorHelpers.h"
 
-ADefaultVehicleCharacter::ADefaultVehicleCharacter() {
+ADefaultVehicleCharacter::ADefaultVehicleCharacter() : m_Controller(nullptr) {
 	ConstructorHelpers::FObjectFinder<USkeletalMesh> MeshObject(L"SkeletalMesh'/Game/Vehicle/Vehicle_SkelMesh.Vehicle_SkelMesh'");
+	ConstructorHelpers::FClassFinder<UAnimInstance> AnimInstance(L"'/Game/Vehicle/VehicleAnimationBlueprint'");
 
-	if (MeshObject.Succeeded()) {
+	if (MeshObject.Succeeded() && AnimInstance.Succeeded()) {
 		GetMesh()->SetSkeletalMesh(MeshObject.Object);
-
+		GetMesh()->SetAnimInstanceClass(AnimInstance.Class);
 	}
 
-/*	UWheeledVehicleMovementComponent4W* VehicleWheel = CastChecked<UWheeledVehicleMovementComponent4W>(GetVehicleMovement());
+	UWheeledVehicleMovementComponent4W* VehicleWheel = CastChecked<UWheeledVehicleMovementComponent4W>(GetVehicleMovement());
 
-	check(VehicleWheel->Wheels.Num() == 4)
+	check(VehicleWheel->WheelSetups.Num() == 4);
 
 	VehicleWheel->WheelSetups[0].WheelClass = UFrontVehicleWheel::StaticClass();
 	VehicleWheel->WheelSetups[0].BoneName = "PhysWheel_FL";
@@ -64,8 +67,7 @@ ADefaultVehicleCharacter::ADefaultVehicleCharacter() {
 	if (UpdatedPrimitive) {
 		UpdatedPrimitive->BodyInstance.COMNudge = FVector(8.f, 0.f, 0.f);
 	}
-
-	VehicleWheel->InertiaTensorScale = FVector(1.f, 1.333f, 1.2f);*/
+	VehicleWheel->InertiaTensorScale = FVector(1.f, 1.333f, 1.2f);
 
 	m_SpringArm = CreateDefaultSubobject<USpringArmComponent>("Spring Arm Component");
 	m_SpringArm->SetRelativeLocation(FVector(0.f, 0.f, 34.f));
@@ -84,26 +86,72 @@ ADefaultVehicleCharacter::ADefaultVehicleCharacter() {
 	m_Camera->FieldOfView = 90.f;
 	m_Camera->bUsePawnControlRotation = false;
 	m_Camera->SetupAttachment(m_SpringArm, USpringArmComponent::SocketName);
+
+	m_bIsPlayer = false;
+	PrimaryActorTick.bCanEverTick = true;
 }
 
 void ADefaultVehicleCharacter::BeginPlay() {
 	Super::BeginPlay();
-
+	m_bIsPlayer = true;
+	if (GetVehicleMovementComponent()) {
+		GetVehicleMovementComponent()->bDeprecatedSpringOffsetMode = true;
+	}
 }
 
 void ADefaultVehicleCharacter::Tick(float DeltaTime) {
 	Super::Tick(DeltaTime);
 
+	if (m_bIsDisconnect) {
+		Destroy();
+	}
+
+	if (!m_bIsPlayer && GetVehicleMovementComponent()) {
+/*		GetVehicleMovementComponent()->SetThrottleInput(m_VehicleState.m_Throttle);
+		GetVehicleMovementComponent()->SetSteeringInput(m_VehicleState.m_Steering);
+		GetVehicleMovementComponent()->SetHandbrakeInput(m_VehicleState.m_HandBreak);*/
+	}
+	else if (m_Controller && m_bIsPlayer && GetVehicleMovementComponent()) {
+/*		FInputMotionData ControllerData = m_Controller->GetControllerData();
+		GetVehicleMovementComponent()->SetThrottleInput(ControllerData.m_Throttle);
+		GetVehicleMovementComponent()->SetSteeringInput(ControllerData.m_Steering);
+		GetVehicleMovementComponent()->SetHandbrakeInput(ControllerData.m_HandBreak);*/
+	}
+}
+
+void ADefaultVehicleCharacter::PossessedBy(AController* NewController) {
+	m_Controller = Cast<AHANSEIRacingController>(NewController);
+	if (!m_Controller) {
+		m_Controller = Cast<AHANSEIRacingController>(NewController);
+	}
 }
 
 void ADefaultVehicleCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
+	PlayerInputComponent->BindAxis("Forward", this, &ADefaultVehicleCharacter::MoveForward);
+	PlayerInputComponent->BindAxis("Right", this, &ADefaultVehicleCharacter::MoveRight);
 
+	PlayerInputComponent->BindAction("HandBreak", IE_Pressed, this, &ADefaultVehicleCharacter::PressedHandBreak);
+	PlayerInputComponent->BindAction("HandBreak", IE_Released, this, &ADefaultVehicleCharacter::ReleaseHandBreak);
 }
 
 void ADefaultVehicleCharacter::MoveForward(float Value) {
+	GetVehicleMovementComponent()->SetThrottleInput(Value);
+	//m_VehicleState.m_Throttle = Value;
 }
 
 void ADefaultVehicleCharacter::MoveRight(float Value) {
+	GetVehicleMovementComponent()->SetSteeringInput(Value);
+//	m_VehicleState.m_Steering = Value;
+}
+
+void ADefaultVehicleCharacter::PressedHandBreak() {
+	GetVehicleMovementComponent()->SetHandbrakeInput(true);
+//	m_VehicleState.m_HandBreak = true;
+}
+
+void ADefaultVehicleCharacter::ReleaseHandBreak() {
+	GetVehicleMovementComponent()->SetHandbrakeInput(false);
+//	m_VehicleState.m_HandBreak = false;
 }
