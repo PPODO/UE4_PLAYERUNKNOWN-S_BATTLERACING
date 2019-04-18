@@ -25,7 +25,6 @@ TArray<UUserWidget*> UMainMenuWidget::CreateSessionList() {
 		}
 		m_SessionList.m_Sessions.clear();
 		m_bIsRefresing = false;
-		UE_LOG(LogTemp, Warning, L"QWE");
 	}
 	return WidgetClass;
 }

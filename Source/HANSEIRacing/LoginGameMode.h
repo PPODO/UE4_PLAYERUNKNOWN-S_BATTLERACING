@@ -23,7 +23,7 @@ public:
 	ALoginGameMode();
 
 public:
-	virtual void RecvDataProcessing(uint8* RecvBuffer) override;
+	virtual void RecvDataProcessing(uint8* RecvBuffer, int32& RecvBytes) override;
 
 protected:
 	virtual void BeginPlay() override;

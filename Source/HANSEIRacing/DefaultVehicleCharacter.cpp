@@ -2,21 +2,50 @@
 #include "FrontVehicleWheel.h"
 #include "RearVehicleWheel.h"
 #include "HANSEIRacingController.h"
+#include "InGameMode.h"
 #include "WheeledVehicleMovementComponent.h"
 #include "WheeledVehicleMovementComponent4W.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Components/TextRenderComponent.h"
 #include "Components/InputComponent.h"
+#include "Components/AudioComponent.h"
+#include "Kismet/KismetMathLibrary.h"
+#include "GameFramework/Character.h"
 #include "Camera/CameraComponent.h"
 #include "ConstructorHelpers.h"
+#include "Sound/SoundCue.h"
+#include "Engine/Engine.h"
 
-ADefaultVehicleCharacter::ADefaultVehicleCharacter() : m_Controller(nullptr) {
+ADefaultVehicleCharacter::ADefaultVehicleCharacter() : m_Controller(nullptr), m_bIsPlayer(false), m_bIsDisconnect(false), m_GameMode(nullptr) {
+	AIControllerClass = APlayerController::StaticClass();
+
 	ConstructorHelpers::FObjectFinder<USkeletalMesh> MeshObject(L"SkeletalMesh'/Game/Vehicle/Vehicle_SkelMesh.Vehicle_SkelMesh'");
+	ConstructorHelpers::FObjectFinder<USoundCue> EngineSoundCue(L"SoundCue'/Game/Vehicle/Sound/Engine_Loop_Cue.Engine_Loop_Cue'");
 	ConstructorHelpers::FClassFinder<UAnimInstance> AnimInstance(L"'/Game/Vehicle/VehicleAnimationBlueprint'");
+	
+	m_ReferenceSrcs.Add(L"'/Game/Materials/AutomotiveMaterials/Materials/Metal/MI_Metal_Chrome_03_Dark.MI_Metal_Chrome_03_Dark'");
+	m_ReferenceSrcs.Add(L"'/Game/Materials/AutomotiveMaterials/Materials/CaliperPaint/MI_Caliper_Silver.MI_Caliper_Silver'");
+	m_ReferenceSrcs.Add(L"'/Game/Materials/AutomotiveMaterials/Materials/CarPaint/MI_CarPaint_05_White.MI_CarPaint_05_White'");
+	m_ReferenceSrcs.Add(L"'/Game/Materials/AutomotiveMaterials/Materials/CarPaint/MI_CarPaint_10_Red.MI_CarPaint_10_Red'");
+	m_ReferenceSrcs.Add(L"'/Game/Materials/AutomotiveMaterials/Materials/Metal/MI_Metal_Chrome_01_Bright.MI_Metal_Chrome_01_Bright'");
+	m_ReferenceSrcs.Add(L"'/Game/Materials/AutomotiveMaterials/Materials/ExhaustFinish/M_Exhaust_Stealth.M_Exhaust_Stealth'");
+	m_ReferenceSrcs.Add(L"'/Game/Materials/AutomotiveMaterials/Materials/CarPaint/MI_CarPaint_11_Orange.MI_CarPaint_11_Orange'");
+	m_ReferenceSrcs.Add(L"'/Game/Materials/AutomotiveMaterials/Materials/CarPaint/MI_CarPaint_12_Yellow.MI_CarPaint_12_Yellow'");
+	m_ReferenceSrcs.Add(L"'/Game/Materials/AutomotiveMaterials/Materials/CarPaint/MI_CarPaint_13_Green.MI_CarPaint_13_Green'");
 
 	if (MeshObject.Succeeded() && AnimInstance.Succeeded()) {
 		GetMesh()->SetSkeletalMesh(MeshObject.Object);
 		GetMesh()->SetAnimInstanceClass(AnimInstance.Class);
+	}
+
+	if (EngineSoundCue.Succeeded()) {
+		m_EngineSoundComponent = CreateDefaultSubobject<UAudioComponent>("Engine Sound Component");
+		if (m_EngineSoundComponent) {
+			m_EngineSoundComponent->SetupAttachment(RootComponent);
+			m_EngineSoundComponent->SetSound(EngineSoundCue.Object);
+		}
 	}
 
 	UWheeledVehicleMovementComponent4W* VehicleWheel = CastChecked<UWheeledVehicleMovementComponent4W>(GetVehicleMovement());
@@ -59,6 +88,8 @@ ADefaultVehicleCharacter::ADefaultVehicleCharacter() : m_Controller(nullptr) {
 
 	VehicleWheel->DifferentialSetup.FrontRearSplit = 0.65f;
 
+	VehicleWheel->bDeprecatedSpringOffsetMode = true;
+//	VehicleWheel->bDeprecatedSpringOffsetMode = false;
 	VehicleWheel->TransmissionSetup.bUseGearAutoBox = true;
 	VehicleWheel->TransmissionSetup.GearSwitchTime = 0.15;
 	VehicleWheel->TransmissionSetup.GearAutoBoxLatency = 1.f;
@@ -87,35 +118,60 @@ ADefaultVehicleCharacter::ADefaultVehicleCharacter() : m_Controller(nullptr) {
 	m_Camera->bUsePawnControlRotation = false;
 	m_Camera->SetupAttachment(m_SpringArm, USpringArmComponent::SocketName);
 
+	m_PlayerName = CreateDefaultSubobject<UTextRenderComponent>("Player Name");
+	m_PlayerName->SetupAttachment(RootComponent);
+	m_PlayerName->SetHorizontalAlignment(EHorizTextAligment::EHTA_Center);
+	m_PlayerName->SetRelativeLocation(FVector(0.f, 0.f, 75.f));
+	m_PlayerName->SetRelativeRotation(FRotator(0.f));
+	m_PlayerName->SetHiddenInGame(true);
+
 	m_bIsPlayer = false;
 	PrimaryActorTick.bCanEverTick = true;
 }
 
 void ADefaultVehicleCharacter::BeginPlay() {
 	Super::BeginPlay();
-	m_bIsPlayer = true;
-	if (GetVehicleMovementComponent()) {
-		GetVehicleMovementComponent()->bDeprecatedSpringOffsetMode = true;
+
+	if (IsValid(m_EngineSoundComponent)) {
+		m_EngineSoundComponent->Play();
+	}
+
+	m_GameMode = Cast<AInGameMode>(GetWorld()->GetAuthGameMode());
+	if (!m_GameMode) {
+		m_GameMode = Cast<AInGameMode>(GetWorld()->GetAuthGameMode());
 	}
 }
 
 void ADefaultVehicleCharacter::Tick(float DeltaTime) {
 	Super::Tick(DeltaTime);
 
-	if (m_bIsDisconnect) {
-		Destroy();
-	}
+	if (IsInGameThread()) {
+		if (m_bIsDisconnect) {
+			Destroy();
+		}
+		if (IsValid(m_PlayerName) && !m_PlayerName->bHiddenInGame) {
+			if (IsValid(GetWorld()->GetFirstPlayerController()) && IsValid(GetWorld()->GetFirstPlayerController()->GetPawn())) {
+				FVector Location = GetWorld()->GetFirstPlayerController()->GetPawn()->GetActorLocation();
+				m_PlayerName->SetWorldRotation(UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), Location));
+			}
+		}
 
-	if (!m_bIsPlayer && GetVehicleMovementComponent()) {
-/*		GetVehicleMovementComponent()->SetThrottleInput(m_VehicleState.m_Throttle);
-		GetVehicleMovementComponent()->SetSteeringInput(m_VehicleState.m_Steering);
-		GetVehicleMovementComponent()->SetHandbrakeInput(m_VehicleState.m_HandBreak);*/
-	}
-	else if (m_Controller && m_bIsPlayer && GetVehicleMovementComponent()) {
-/*		FInputMotionData ControllerData = m_Controller->GetControllerData();
-		GetVehicleMovementComponent()->SetThrottleInput(ControllerData.m_Throttle);
-		GetVehicleMovementComponent()->SetSteeringInput(ControllerData.m_Steering);
-		GetVehicleMovementComponent()->SetHandbrakeInput(ControllerData.m_HandBreak);*/
+/*		if (!m_bIsPlayer && GetVehicleMovement()) {
+			GetVehicleMovement()->SetThrottleInput(m_VehicleState.m_Throttle);
+			GetVehicleMovement()->SetSteeringInput(m_VehicleState.m_Steering);
+			GetVehicleMovement()->SetHandbrakeInput(m_VehicleState.m_HandBreak);
+		}
+/*		else if (m_Controller && m_bIsPlayer && GetVehicleMovementComponent()) {
+			FInputMotionData ControllerData = m_Controller->GetControllerData();
+			GetVehicleMovementComponent()->SetThrottleInput(ControllerData.m_Throttle);
+			GetVehicleMovementComponent()->SetSteeringInput(ControllerData.m_Steering);
+			GetVehicleMovementComponent()->SetHandbrakeInput(ControllerData.m_HandBreak);
+		}*/
+
+		if (IsValid(m_EngineSoundComponent)) {
+			float RPMToAudioScale = 2500.0f / GetVehicleMovement()->GetEngineMaxRotationSpeed();
+			m_EngineSoundComponent->SetFloatParameter("RPM", GetVehicleMovement()->GetEngineRotationSpeed() * RPMToAudioScale);
+		}
 	}
 }
 
@@ -134,24 +190,44 @@ void ADefaultVehicleCharacter::SetupPlayerInputComponent(UInputComponent* Player
 
 	PlayerInputComponent->BindAction("HandBreak", IE_Pressed, this, &ADefaultVehicleCharacter::PressedHandBreak);
 	PlayerInputComponent->BindAction("HandBreak", IE_Released, this, &ADefaultVehicleCharacter::ReleaseHandBreak);
+	PlayerInputComponent->BindAction("ReadyAndStart", IE_Pressed, this, &ADefaultVehicleCharacter::PresseedStartGame);
 }
 
 void ADefaultVehicleCharacter::MoveForward(float Value) {
 	GetVehicleMovementComponent()->SetThrottleInput(Value);
-	//m_VehicleState.m_Throttle = Value;
 }
 
 void ADefaultVehicleCharacter::MoveRight(float Value) {
 	GetVehicleMovementComponent()->SetSteeringInput(Value);
-//	m_VehicleState.m_Steering = Value;
 }
 
 void ADefaultVehicleCharacter::PressedHandBreak() {
 	GetVehicleMovementComponent()->SetHandbrakeInput(true);
-//	m_VehicleState.m_HandBreak = true;
 }
 
 void ADefaultVehicleCharacter::ReleaseHandBreak() {
 	GetVehicleMovementComponent()->SetHandbrakeInput(false);
-//	m_VehicleState.m_HandBreak = false;
+}
+
+void ADefaultVehicleCharacter::PresseedStartGame() {
+	if (IsValid(m_GameMode)) {
+		m_GameMode->SendStartGame();
+	}
+}
+
+void ADefaultVehicleCharacter::SetPlayerName(const FString& Text) {
+	if (IsValid(m_PlayerName)) {
+		m_PlayerName->SetText(Text);
+		m_PlayerName->SetHiddenInGame(m_bIsPlayer);
+	}
+	m_PlayerNickName = Text;
+}
+
+void ADefaultVehicleCharacter::SetMaterialFromUniqueKey(const int32& Index) {
+	if (Index < m_ReferenceSrcs.Num()) {
+		auto MaterialObject = LoadObject<UMaterialInstance>(nullptr, m_ReferenceSrcs[Index]);
+		if (GetMesh() && MaterialObject) {
+			GetMesh()->SetMaterial(0, UMaterialInstanceDynamic::Create(MaterialObject, nullptr));
+		}
+	}
 }

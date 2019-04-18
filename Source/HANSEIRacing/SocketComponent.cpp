@@ -3,6 +3,7 @@
 #include "SocketSubsystem.h"
 #include "PlatformProcess.h"
 #include "IPAddress.h"
+#include "Engine/Engine.h"
 
 FSocketComponent::FSocketComponent() : m_GameMode(nullptr), m_ThreadSafeCounter(0), m_Socket(nullptr), m_Address(nullptr) {
 	memset(MessageBuffer, 0, MaxBufferSize);
@@ -33,7 +34,7 @@ uint32 FSocketComponent::Run() {
 		}
 		else if(m_Socket && m_GameMode) {
 			if (m_Socket->HasPendingData(PendingData) && m_Socket->Recv((uint8*)MessageBuffer, MaxBufferSize, RecvBytes)) {
-				m_GameMode->RecvDataProcessing(MessageBuffer);
+				m_GameMode->RecvDataProcessing(MessageBuffer, RecvBytes);
 				memset(MessageBuffer, 0, MaxBufferSize);
 			}
 		}
@@ -65,7 +66,7 @@ void FSocketComponent::ConnectToServer(class ABaseGameMode* GM, int32 Port, cons
 	}
 
 	m_Address = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateInternetAddr();
-	m_Address->SetIp(L"172.30.1.15", bIsValid);
+	m_Address->SetIp(L"192.168.1.57", bIsValid);
 	m_Address->SetPort(Port);
 
 	m_Socket = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateSocket(NAME_None, SocketName, false);

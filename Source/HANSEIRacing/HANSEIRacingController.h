@@ -37,6 +37,7 @@ private:
 
 private:
 	class ADefaultVehicleCharacter* m_Character;
+	class AInGameMode* m_GameMode;
 
 private:
 	FTimerHandle m_TimerHandle;

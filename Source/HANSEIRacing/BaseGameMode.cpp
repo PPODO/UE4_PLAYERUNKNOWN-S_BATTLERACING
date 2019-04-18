@@ -35,5 +35,5 @@ void ABaseGameMode::BeginDestroy() {
 	}
 }
 
-void ABaseGameMode::RecvDataProcessing(uint8 * RecvBuffer) {
+void ABaseGameMode::RecvDataProcessing(uint8 * RecvBuffer, int32& RecvBytes) {
 }

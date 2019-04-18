@@ -1,5 +1,7 @@
 #include "HANSEIRacingController.h"
 #include "DefaultVehicleCharacter.h"
+#include "DefaultCharacter.h"
+#include "InGameMode.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 
@@ -42,18 +44,17 @@ void AHANSEIRacingController::LocationSendTimerStart(AGameModeBase* GM) {
 	GetWorld()->GetTimerManager().SetTimer(m_TimerHandle, this, &AHANSEIRacingController::IsItNearlyEqualActorInformation, 0.016f, true);
 
 	if (GM) {
+		m_GameMode = Cast<AInGameMode>(GM);
 	}
 }
 
 void AHANSEIRacingController::IsItNearlyEqualActorInformation() {
-/*	if (IsValid(m_Character) && IsValid(m_GameMode)) {
-		PLAYER::VehicleState ActorState = m_Character->GetVehicleState();
+	if (IsValid(m_Character) && IsValid(m_GameMode)) {
 		FVector ActorLocation = m_Character->GetActorLocation();
-		FVector ActorRotation(m_Character->GetActorRotation().Pitch, m_Character->GetActorRotation().Yaw, m_Character->GetActorRotation().Roll);
+		FRotator ActorRotation = m_Character->GetActorRotation();
 
-		m_Location = ActorLocation; m_Rotation = ActorRotation;
-		m_GameMode->SendPlayerInformation(m_Location, m_Rotation, ActorState);
-	}*/
+		m_GameMode->SendCharacterInformationToServer(ActorLocation, ActorRotation, m_ControllerData);
+	}
 }
 
 void AHANSEIRacingController::RecvControllerData(const FArrayReaderPtr& Ptr, const FIPv4Endpoint & EndPoint) {

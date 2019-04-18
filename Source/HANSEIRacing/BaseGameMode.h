@@ -23,7 +23,7 @@ public:
 	ABaseGameMode();
 
 public:
-	virtual void RecvDataProcessing(uint8* RecvBuffer);
+	virtual void RecvDataProcessing(uint8* RecvBuffer, int32& RecvBytes);
 
 protected:
 	virtual void BeginPlay() override;

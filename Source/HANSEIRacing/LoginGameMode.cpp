@@ -3,6 +3,8 @@
 #include "MainMenuWidget.h"
 #include "HANSEIRacingGameInstance.h"
 #include "Kismet/GameplayStatics.h"
+#include "ConstructorHelpers.h"
+#include "Sound/SoundCue.h"
 
 ALoginGameMode::ALoginGameMode() : m_GameInstance(nullptr), m_LoginWidget(nullptr), m_MenuWidget(nullptr), m_bIsDisConnect(false) {
 	m_Port = 3515;
@@ -25,7 +27,7 @@ void ALoginGameMode::Tick(float DeltaTime) {
 
 	if (IsInGameThread()) {
 		if (m_bIsDisConnect) {
-			UGameplayStatics::OpenLevel(this, "/Game/Maps/sex");
+			UGameplayStatics::OpenLevel(this, "/Game/Maps/InGameMap");
 		}
 	}
 }
@@ -35,7 +37,7 @@ void ALoginGameMode::BeginDestroy() {
 
 }
 
-void ALoginGameMode::RecvDataProcessing(uint8 * RecvBuffer) {
+void ALoginGameMode::RecvDataProcessing(uint8 * RecvBuffer, int32& RecvBytes) {
 	int32 PacketType = -1;
 	std::stringstream RecvStream(TCHAR_TO_ANSI(UTF8_TO_TCHAR(RecvBuffer)));
 	RecvStream >> PacketType;
@@ -102,11 +104,14 @@ void ALoginGameMode::IsSucceedCreateAccount(std::stringstream& RecvStream) {
 }
 
 void ALoginGameMode::IsSucceedCreateSession(std::stringstream & RecvStream) {
-	int32 IsSucceed = -1;
-	RecvStream >> IsSucceed;
+	int32 IsSucceed = -1, SessionID;
+	RecvStream >> IsSucceed >> SessionID;
 
-	if (IsSucceed >= 0 && IsSucceed < static_cast<int32>(EPACKETFAILEDTYPE::EPFT_COUNT)) {
+	if (SessionID >= 0 && IsSucceed >= 0 && IsSucceed < static_cast<int32>(EPACKETFAILEDTYPE::EPFT_COUNT)) {
 		if (IsSucceed == static_cast<int32>(EPACKETFAILEDTYPE::EPFT_SUCCEED)) {
+			if (m_GameInstance) {
+				m_GameInstance->SetSessionID(SessionID);
+			}
 			m_bIsDisConnect = true;
 		}
 		else {
@@ -133,11 +138,14 @@ void ALoginGameMode::IsSucceedGetSessionList(std::stringstream & RecvStream) {
 }
 
 void ALoginGameMode::IsSucceedJoinSession(std::stringstream & RecvStream) {
-	int32 IsSucceed = -1;
-	RecvStream >> IsSucceed;
+	int32 IsSucceed = -1, SessionID = -1;
+	RecvStream >> IsSucceed >> SessionID;
 
-	if (IsSucceed >= 0 && IsSucceed < static_cast<int32>(EPACKETFAILEDTYPE::EPFT_COUNT)) {
+	if (SessionID >= 0 && IsSucceed >= 0 && IsSucceed < static_cast<int32>(EPACKETFAILEDTYPE::EPFT_COUNT)) {
 		if (IsSucceed == static_cast<int32>(EPACKETFAILEDTYPE::EPFT_SUCCEED)) {
+			if (m_GameInstance) {
+				m_GameInstance->SetSessionID(SessionID);
+			}
 			m_bIsDisConnect = true;
 		}
 		else {
