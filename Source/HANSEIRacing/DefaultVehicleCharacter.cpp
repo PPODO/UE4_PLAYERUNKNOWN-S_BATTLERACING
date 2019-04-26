@@ -104,6 +104,7 @@ ADefaultVehicleCharacter::ADefaultVehicleCharacter() : m_Controller(nullptr), m_
 	m_SpringArm->SetRelativeLocation(FVector(0.f, 0.f, 34.f));
 	m_SpringArm->SetRelativeRotation(FRotator(-20.f, 0.f, 0.f));
 	m_SpringArm->TargetArmLength = 125.f;
+	m_SpringArm->bDoCollisionTest = false;
 	m_SpringArm->bEnableCameraLag = false;
 	m_SpringArm->bEnableCameraRotationLag = false;
 	m_SpringArm->bInheritPitch = true;
@@ -224,8 +225,8 @@ void ADefaultVehicleCharacter::SetPlayerName(const FString& Text) {
 }
 
 void ADefaultVehicleCharacter::SetMaterialFromUniqueKey(const int32& Index) {
-	if (Index < m_ReferenceSrcs.Num()) {
-		auto MaterialObject = LoadObject<UMaterialInstance>(nullptr, m_ReferenceSrcs[Index]);
+	if (Index >= 0) {
+		auto MaterialObject = LoadObject<UMaterialInstance>(nullptr, m_ReferenceSrcs[Index % m_ReferenceSrcs.Num()]);
 		if (GetMesh() && MaterialObject) {
 			GetMesh()->SetMaterial(0, UMaterialInstanceDynamic::Create(MaterialObject, nullptr));
 		}

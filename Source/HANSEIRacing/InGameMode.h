@@ -27,6 +27,11 @@ enum class EPACKETTYPE : uint8 {
 	EPT_COUNT
 };
 
+enum class EITEMTYPE : uint8 {
+	EIT_HEAL,
+	EIT_COUNT
+};
+
 struct VECTOR {
 	float x, y, z;
 
@@ -50,9 +55,21 @@ struct PACKET {
 	EPACKETTYPE m_PacketType;
 	EPACKETMESSAGEFORGAMETYPE m_MessageType;
 	EPACKETFAILEDTYPE m_FailedReason;
+	UINT_PTR m_Socket;
 
 public:
 	PACKET() : m_PacketType(EPACKETTYPE::EPT_COUNT), m_MessageType(EPACKETMESSAGEFORGAMETYPE::EPMGT_COUNT), m_FailedReason(EPACKETFAILEDTYPE::EPFT_COUNT) {};
+
+};
+
+struct ITEM {
+	EITEMTYPE m_ItemType;
+	bool m_bIsActivated;
+	size_t m_SpawnerID;
+	size_t m_Index;
+
+public:
+	ITEM() : m_ItemType(EITEMTYPE::EIT_COUNT), m_bIsActivated(false), m_SpawnerID(0), m_Index(0) {};
 
 };
 
@@ -62,7 +79,7 @@ struct GAMEPACKET : public PACKET {
 	VECTOR m_Location;
 	VECTOR m_Rotation;
 	struct FInputMotionData m_VehicleData;
-	UINT_PTR m_Socket;
+	ITEM m_ItemInformation;
 	char m_PlayerNickName[NickNameMaxLen];
 
 public:
@@ -71,8 +88,13 @@ public:
 		this->m_Location = Data.m_Location;
 		this->m_Rotation = Data.m_Rotation;
 		this->m_VehicleData = Data.m_VehicleData;
+		this->m_ItemInformation = Data.m_ItemInformation;
 	}
 
+};
+
+struct SPAWNERPACKET : public PACKET {
+	ITEM m_ItemInformation;
 };
 
 UCLASS()
@@ -96,6 +118,7 @@ private:
 	class ADefaultVehicleCharacter* m_Character;
 	TArray<class AActor*> m_SpawnPoint;
 	TArray<class AActor*> m_StartPoint;
+	TArray<class AActor*> m_ItemSpawners;
 	TMap<int32, class ADefaultVehicleCharacter*> m_CharacterClass;
 	bool m_bIsSpawnPlayer;
 	UINT_PTR m_SocketNumber;
@@ -108,7 +131,7 @@ private:
 	std::stack<PACKET*> m_PacketStack;
 
 private:
-	uint8* RecvBufferShiftProcess(uint8* RecvBuffer, const int32& RecvBytes, const int32& PacketSize);
+	uint8* RecvBufferShiftProcess(uint8* RecvBuffer, const int32& PacketSize, const int32& CurrentCount);
 	void UpdatePlayerLocationAndRotation();
 	void SpawnCharacter();
 	void TeleportCharacters();
@@ -118,7 +141,7 @@ private:
 	// INLINE Function
 	FORCEINLINE int32 CalculatePacketSize(const PACKET* Packet);
 	FORCEINLINE AActor* FindSpawnPointByUniqueKey(const int32& UniqueKey);
-	FORCEINLINE void SpawnPawnAndAddCharacterList(class ADefaultVehicleCharacter* NewPawn, const int32& UniqueKey, const ANSICHAR* PlayerName);
+	FORCEINLINE void SpawnPawnAndAddCharacterList(class ADefaultVehicleCharacter* NewPawn, const int32& UniqueKey, const ANSICHAR* PlayerName, const int32& CurrentIndex);
 
 public:
 	// FROM Server
@@ -127,6 +150,7 @@ public:
 	void IsSucceedDisconnectOtherPlayer(GAMEPACKET& Packet);
 	void IsSucceedUpdatePlayerInformation(GAMEPACKET& Packet);
 	void IsSucceedStartGame(GAMEPACKET& Packet);
+	void IsSucceedRespawnItem(SPAWNERPACKET& Packet);
 
 public:
 	// TO Server
@@ -134,6 +158,7 @@ public:
 	void SendCharacterInformationToServer(const FVector& Location, const FRotator& Rotation, const struct FInputMotionData& Data);
 	void SendDisconnectToServer();
 	void SendStartGame();
+	void SendRespawnItemToServer(const int32& SpawnerID, const int32& ItemIndex);
 
 public:
 	UFUNCTION(BlueprintCallable)

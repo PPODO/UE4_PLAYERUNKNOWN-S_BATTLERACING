@@ -17,10 +17,26 @@ protected:
 	virtual void Tick(float DeltaTime) override;
 
 private:
+	UPROPERTY(EditAnywhere)
+		class UBoxComponent* m_BoxCollisionComponent;
 	UPROPERTY()
 		class UStaticMeshComponent* m_ItemBoxMesh;
 
 private:
+	UFUNCTION()
+		void OnComponentOverlapBegin(class UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, class UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+private:
+	class AInGameMode* m_GameMode;
+
+private:
 	FRotator m_RotateDirection;
+	int32 m_IndexNumber;
+
+public:
+	void ResetItemBox();
+
+public:
+	FORCEINLINE void SetIndexNumber(const int32& NewIndex) { m_IndexNumber = NewIndex; }
 
 };

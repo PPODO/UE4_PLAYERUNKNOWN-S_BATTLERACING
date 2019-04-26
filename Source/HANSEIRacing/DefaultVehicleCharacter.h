@@ -19,6 +19,10 @@ protected:
 	virtual void PossessedBy(class AController* NewController) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+public:
+	UPROPERTY(BlueprintReadWrite)
+		int32 m_SplinePointNumber = 0;
+
 private:
 	UFUNCTION()
 		void MoveForward(float Value);

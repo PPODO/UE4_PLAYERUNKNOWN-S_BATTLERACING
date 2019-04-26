@@ -9,4 +9,8 @@ class HANSEIRACING_API AStartPoint : public ATargetPoint
 {
 	GENERATED_BODY()
 	
+public:
+	UPROPERTY(EditAnywhere)
+		int32 m_StartPointTag;
+
 };
