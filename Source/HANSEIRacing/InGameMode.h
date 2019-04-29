@@ -4,7 +4,7 @@
 #include "CoreMinimal.h"
 #include "BaseGameMode.h"
 #include <vector>
-#include <stack>
+#include <queue>
 #include "InGameMode.generated.h"
 
 static const int32 NickNameMaxLen = 15;
@@ -15,6 +15,7 @@ enum class EPACKETMESSAGEFORGAMETYPE : uint8 {
 	EPMGT_UPDATE,
 	EPMGT_DISCONNECT,
 	EPMGT_STARTGAME,
+	EPMGT_READY,
 	EPMGT_SPAWNITEM,
 	EPMGT_NEWPLAYER,
 	EPMGT_DISCONNECTOTHER,
@@ -58,7 +59,7 @@ struct PACKET {
 	UINT_PTR m_Socket;
 
 public:
-	PACKET() : m_PacketType(EPACKETTYPE::EPT_COUNT), m_MessageType(EPACKETMESSAGEFORGAMETYPE::EPMGT_COUNT), m_FailedReason(EPACKETFAILEDTYPE::EPFT_COUNT) {};
+	PACKET() : m_PacketType(EPACKETTYPE::EPT_COUNT), m_MessageType(EPACKETMESSAGEFORGAMETYPE::EPMGT_COUNT), m_FailedReason(EPACKETFAILEDTYPE::EPFT_COUNT), m_Socket(0) {};
 
 };
 
@@ -73,13 +74,27 @@ public:
 
 };
 
+struct RANK {
+	int m_CurrentRank;
+	int m_CurrentSplinePoint;
+	float m_SplinePointDistance;
+	int m_CurrentLab;
+
+public:
+	RANK() : m_CurrentRank(0), m_CurrentSplinePoint(0), m_SplinePointDistance(0.f), m_CurrentLab(0) {};
+
+};
+
 struct GAMEPACKET : public PACKET {
 	int m_SessionID;
 	int m_UniqueKey;
 	VECTOR m_Location;
 	VECTOR m_Rotation;
 	struct FInputMotionData m_VehicleData;
+	bool m_bIsLeader;
+	bool m_bIsReady;
 	ITEM m_ItemInformation;
+	RANK m_RankInformation;
 	char m_PlayerNickName[NickNameMaxLen];
 
 public:
@@ -89,6 +104,9 @@ public:
 		this->m_Rotation = Data.m_Rotation;
 		this->m_VehicleData = Data.m_VehicleData;
 		this->m_ItemInformation = Data.m_ItemInformation;
+		this->m_RankInformation = Data.m_RankInformation;
+		this->m_bIsLeader = Data.m_bIsLeader;
+		this->m_bIsReady = Data.m_bIsReady;
 	}
 
 };
@@ -114,6 +132,7 @@ protected:
 
 private:
 	class UInGameWidget* m_InGameWidget;
+	class ULobbyWidget* m_LobbyWidget;
 	class UHANSEIRacingGameInstance* m_GameInstance;
 	class ADefaultVehicleCharacter* m_Character;
 	TArray<class AActor*> m_SpawnPoint;
@@ -125,23 +144,23 @@ private:
 
 private:
 	bool m_bIsInGame, m_bIsTeleport;
+	bool m_bIsLeader, m_bIsReady;
 
 private:
 	std::vector<GAMEPACKET> m_PlayerList;
-	std::stack<PACKET*> m_PacketStack;
+	std::queue<PACKET*> m_PacketQueue;
 
 private:
 	uint8* RecvBufferShiftProcess(uint8* RecvBuffer, const int32& PacketSize, const int32& CurrentCount);
 	void UpdatePlayerLocationAndRotation();
 	void SpawnCharacter();
 	void TeleportCharacters();
-	void ResetPlayerCurrentRank(const int32& UniqueKey, const int32& TargetRank);
 
 private:
 	// INLINE Function
 	FORCEINLINE int32 CalculatePacketSize(const PACKET* Packet);
 	FORCEINLINE AActor* FindSpawnPointByUniqueKey(const int32& UniqueKey);
-	FORCEINLINE void SpawnPawnAndAddCharacterList(class ADefaultVehicleCharacter* NewPawn, const int32& UniqueKey, const ANSICHAR* PlayerName, const int32& CurrentIndex);
+	FORCEINLINE void SpawnPawnAndAddCharacterList(class ADefaultVehicleCharacter* NewPawn, const int32& UniqueKey, const ANSICHAR* PlayerName, const int32& PlayerRank);
 
 public:
 	// FROM Server
@@ -150,6 +169,7 @@ public:
 	void IsSucceedDisconnectOtherPlayer(GAMEPACKET& Packet);
 	void IsSucceedUpdatePlayerInformation(GAMEPACKET& Packet);
 	void IsSucceedStartGame(GAMEPACKET& Packet);
+	void IsSucceedChangeReadyState(GAMEPACKET& Packet);
 	void IsSucceedRespawnItem(SPAWNERPACKET& Packet);
 
 public:
@@ -162,6 +182,17 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable)
+		void SendChangeReadyState();
+
+public:
+	UFUNCTION(BlueprintCallable)
 		void SetInGameWidgetClass(class UInGameWidget* Widget) { if (Widget) { m_InGameWidget = Widget; } }
+
+	UFUNCTION(BlueprintCallable)
+		void SetLobbyWidgetClass(class ULobbyWidget* Widget) { if (Widget) { m_LobbyWidget = Widget; } }
+
+public:
+	UFUNCTION(BlueprintCallable)
+		FORCEINLINE bool GetIsLeader() const { return m_bIsLeader; }
 
 };

@@ -14,7 +14,7 @@ protected:
 
 public:
 	UPROPERTY(BlueprintReadOnly)
-		TMap<int32, class ADefaultVehicleCharacter*> m_CharacterClass;
+		TArray<class ADefaultVehicleCharacter*> m_CharacterClass;
 
 private:
 	bool m_bIsUpdateClassData = false;
@@ -25,6 +25,6 @@ public:
 		void UpdatePlayerList_Implementation();
 
 public:
-	void SetCharacterClassData(const TMap<int32, class ADefaultVehicleCharacter*>& Data) { m_CharacterClass = Data; m_bIsUpdateClassData = true; }
+	void SetCharacterClassData(const TMap<int32, class ADefaultVehicleCharacter*>& Data);
 
 };

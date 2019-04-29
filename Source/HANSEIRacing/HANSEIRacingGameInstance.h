@@ -25,13 +25,12 @@ private:
 
 public:
 	FORCEINLINE void SetPlayerNickName(const FString& NickName) { m_PlayerNickName = NickName; }
-	FORCEINLINE void SetSessionName(const FString& Name) { m_SessionName = Name; }
 	FORCEINLINE void SetIsLogined(const bool b) { m_bIsLogined = b; }
 	FORCEINLINE void SetUniqueKey(int32 Key) { m_UniqueKey = Key; }
 	FORCEINLINE void SetSessionID(const int32 ID) { m_SessionID = ID; }
+	FORCEINLINE void SetSessionName(const FString& SessionName) { m_SessionName = SessionName; }
 
 public:
-	FORCEINLINE FString GetSessionName() const { return m_SessionName; }
 	FORCEINLINE int32 GetUniqueKey() const { return m_UniqueKey; }
 	FORCEINLINE int32 GetSessionID() const { return m_SessionID; }
 
@@ -40,5 +39,7 @@ public:
 		FORCEINLINE FString GetPlayerNickName() const { return m_PlayerNickName; }
 	UFUNCTION(BlueprintCallable)
 		FORCEINLINE bool GetIsLogined() const { return m_bIsLogined; }
+	UFUNCTION(BlueprintCallable)
+		FORCEINLINE FString GetSessionName() const { return m_SessionName; }
 
 };

@@ -21,7 +21,9 @@ protected:
 
 public:
 	UPROPERTY(BlueprintReadWrite)
-		int32 m_SplinePointNumber = 0;
+		int32 m_CurrentSplinePoint = 0;
+	UPROPERTY(BlueprintReadWrite)
+		float m_SplinePointDistance;
 
 private:
 	UFUNCTION()
@@ -70,9 +72,6 @@ public:
 public:
 	void SetMaterialFromUniqueKey(const int32& Index);
 	void SetPlayerName(const FString& Text);
-
-public:
-
 
 public:
 	UFUNCTION(BlueprintCallable)

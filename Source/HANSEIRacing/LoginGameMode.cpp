@@ -105,12 +105,14 @@ void ALoginGameMode::IsSucceedCreateAccount(std::stringstream& RecvStream) {
 
 void ALoginGameMode::IsSucceedCreateSession(std::stringstream & RecvStream) {
 	int32 IsSucceed = -1, SessionID;
-	RecvStream >> IsSucceed >> SessionID;
+	std::string SessionName;
+	RecvStream >> IsSucceed >> SessionID >> SessionName;
 
 	if (SessionID >= 0 && IsSucceed >= 0 && IsSucceed < static_cast<int32>(EPACKETFAILEDTYPE::EPFT_COUNT)) {
 		if (IsSucceed == static_cast<int32>(EPACKETFAILEDTYPE::EPFT_SUCCEED)) {
 			if (m_GameInstance) {
 				m_GameInstance->SetSessionID(SessionID);
+				m_GameInstance->SetSessionName(ANSI_TO_TCHAR(SessionName.c_str()));
 			}
 			m_bIsDisConnect = true;
 		}
@@ -139,12 +141,14 @@ void ALoginGameMode::IsSucceedGetSessionList(std::stringstream & RecvStream) {
 
 void ALoginGameMode::IsSucceedJoinSession(std::stringstream & RecvStream) {
 	int32 IsSucceed = -1, SessionID = -1;
-	RecvStream >> IsSucceed >> SessionID;
+	std::string SessionName;
+	RecvStream >> IsSucceed >> SessionID >> SessionName;
 
 	if (SessionID >= 0 && IsSucceed >= 0 && IsSucceed < static_cast<int32>(EPACKETFAILEDTYPE::EPFT_COUNT)) {
 		if (IsSucceed == static_cast<int32>(EPACKETFAILEDTYPE::EPFT_SUCCEED)) {
 			if (m_GameInstance) {
 				m_GameInstance->SetSessionID(SessionID);
+				m_GameInstance->SetSessionName(ANSI_TO_TCHAR(SessionName.c_str()));
 			}
 			m_bIsDisConnect = true;
 		}

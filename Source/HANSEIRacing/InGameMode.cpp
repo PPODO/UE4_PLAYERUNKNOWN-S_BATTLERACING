@@ -1,6 +1,7 @@
 #include "InGameMode.h"
 #include "ItemSpawner.h"
 #include "InGameWidget.h"
+#include "LobbyWidget.h"
 #include "HANSEIRacingController.h"
 #include "HANSEIRacingGameInstance.h"
 #include "DefaultVehicleCharacter.h"
@@ -9,10 +10,9 @@
 #include "StartPoint.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
-#include <memory>
 #include <algorithm>
 
-AInGameMode::AInGameMode() : m_GameInstance(nullptr), m_Character(nullptr), m_bIsSpawnPlayer(false), m_SocketNumber(0), m_bIsInGame(false), m_bIsTeleport(false) {
+AInGameMode::AInGameMode() : m_GameInstance(nullptr), m_InGameWidget(nullptr), m_LobbyWidget(nullptr), m_Character(nullptr), m_bIsSpawnPlayer(false), m_bIsLeader(false), m_bIsReady(false), m_SocketNumber(0), m_bIsInGame(false), m_bIsTeleport(false) {
 	PlayerControllerClass = AHANSEIRacingController::StaticClass();
 
 	m_Port = 3500;
@@ -61,12 +61,13 @@ void AInGameMode::RecvDataProcessing(uint8* RecvBuffer, int32& RecvBytes) {
 	if (Packet) {
 		int32 PacketSize = CalculatePacketSize(Packet);
 		if (PacketSize > 0) {
-			m_PacketStack.push(Packet);
-			for (int32 i = 0; i < (RecvBytes / PacketSize) - 1; i++) {
-				uint8* ShiftBuffer = RecvBufferShiftProcess(RecvBuffer, PacketSize, i + 1);
-				if (reinterpret_cast<PACKET*>(ShiftBuffer)) {
-					m_PacketStack.push((PACKET*)ShiftBuffer);
-					PacketSize = CalculatePacketSize(m_PacketStack.top());
+			m_PacketQueue.push(Packet);
+			for (int32 i = 1; i < (RecvBytes / PacketSize); i++) {
+				uint8* ShiftBuffer = RecvBufferShiftProcess(RecvBuffer, PacketSize, i);
+				PACKET* Pack = reinterpret_cast<PACKET*>(ShiftBuffer);
+				if (Pack) {
+					m_PacketQueue.push(Pack);
+					PacketSize = CalculatePacketSize(m_PacketQueue.front());
 					if (PacketSize <= 0) {
 						break;
 					}
@@ -75,8 +76,8 @@ void AInGameMode::RecvDataProcessing(uint8* RecvBuffer, int32& RecvBytes) {
 		}
 	}
 	
-	while (!m_PacketStack.empty()) {
-		PACKET* Packet = m_PacketStack.top();
+	while (!m_PacketQueue.empty()) {
+		PACKET* Packet = m_PacketQueue.front();
 
 		switch (Packet->m_MessageType) {
 		case EPACKETMESSAGEFORGAMETYPE::EPMGT_JOIN:
@@ -94,11 +95,14 @@ void AInGameMode::RecvDataProcessing(uint8* RecvBuffer, int32& RecvBytes) {
 		case EPACKETMESSAGEFORGAMETYPE::EPMGT_STARTGAME:
 			IsSucceedStartGame(*static_cast<GAMEPACKET*>(Packet));
 			break;
+		case EPACKETMESSAGEFORGAMETYPE::EPMGT_READY:
+			IsSucceedChangeReadyState(*static_cast<GAMEPACKET*>(Packet));
+			break;
 		case EPACKETMESSAGEFORGAMETYPE::EPMGT_SPAWNITEM:
 			IsSucceedRespawnItem(*static_cast<SPAWNERPACKET*>(Packet));
 			break;
 		}
-		m_PacketStack.pop();
+		m_PacketQueue.pop();
 	}
 }
 
@@ -109,11 +113,14 @@ void AInGameMode::IsSucceedJoinGame(GAMEPACKET& Packet) {
 		if (m_GameInstance && m_GameInstance->IsValidLowLevel()) {
 			m_GameInstance->SetUniqueKey(Packet.m_UniqueKey);
 		}
+		m_bIsLeader = Packet.m_bIsLeader;
 		m_SocketNumber = Packet.m_Socket;
 		m_PlayerList.push_back(Packet);
 		m_bIsSpawnPlayer = true;
 
-		UE_LOG(LogTemp, Warning, L"%s", ANSI_TO_TCHAR(Packet.m_PlayerNickName));
+		if (IsValid(m_LobbyWidget)) {
+			m_LobbyWidget->SetPlayerList(m_PlayerList);
+		}
 	}
 }
 
@@ -122,7 +129,9 @@ void AInGameMode::IsSucceedJoinGameNewPlayer(GAMEPACKET& Packet) {
 		m_PlayerList.push_back(Packet);
 		m_bIsSpawnPlayer = true;
 
-		UE_LOG(LogTemp, Warning, L"%s", ANSI_TO_TCHAR(Packet.m_PlayerNickName));
+		if (IsValid(m_LobbyWidget)) {
+			m_LobbyWidget->SetPlayerList(m_PlayerList);
+		}
 	}
 }
 
@@ -131,13 +140,21 @@ void AInGameMode::IsSucceedDisconnectOtherPlayer(GAMEPACKET& Packet) {
 		auto Character = m_CharacterClass.Find(Packet.m_UniqueKey);
 		auto CharacterList = std::find_if(m_PlayerList.begin(), m_PlayerList.end(), [&](const GAMEPACKET& Data) -> bool { if (Data.m_UniqueKey == Packet.m_UniqueKey) { return true; } return false; });
 		if (Character != nullptr && CharacterList != m_PlayerList.cend()) {
-			ResetPlayerCurrentRank(Packet.m_UniqueKey, (*Character)->GetPlayerCurrentRank());
 			(*Character)->SetIsDisconnect(true);
 			m_PlayerList.erase(CharacterList);
 			m_CharacterClass.Remove(Packet.m_UniqueKey);
 		}
-		if (IsValid(m_InGameWidget)) {
-			m_InGameWidget->SetCharacterClassData(m_CharacterClass);
+
+		// Update Player List
+		if (m_bIsInGame) {
+			if (IsValid(m_InGameWidget)) {
+				m_InGameWidget->SetCharacterClassData(m_CharacterClass);
+			}
+		}
+		else {
+			if (IsValid(m_LobbyWidget)) {
+				m_LobbyWidget->SetPlayerList(m_PlayerList);
+			}
 		}
 	}
 }
@@ -154,6 +171,21 @@ void AInGameMode::IsSucceedUpdatePlayerInformation(GAMEPACKET& Packet) {
 void AInGameMode::IsSucceedStartGame(GAMEPACKET& Packet) {
 	if (Packet.m_FailedReason == EPACKETFAILEDTYPE::EPFT_SUCCEED) {
 		m_bIsTeleport = m_bIsInGame = true;
+	}
+}
+
+void AInGameMode::IsSucceedChangeReadyState(GAMEPACKET& Packet) {
+	if (!m_bIsInGame) {
+		if (Packet.m_FailedReason == EPACKETFAILEDTYPE::EPFT_SUCCEED) {
+			auto Character = std::find_if(m_PlayerList.begin(), m_PlayerList.end(), [&](const GAMEPACKET& Data) -> bool { if (Data.m_UniqueKey == Packet.m_UniqueKey) { return true; } return false; });
+			if (Character != m_PlayerList.cend() && IsValid(m_LobbyWidget)) {
+				if (Character->m_UniqueKey == m_GameInstance->GetUniqueKey()) {
+					m_bIsReady = Packet.m_bIsReady;
+				}
+				Character->m_bIsReady = Packet.m_bIsReady;
+				m_LobbyWidget->SetPlayerList(m_PlayerList);
+			}
+		}
 	}
 }
 
@@ -176,6 +208,7 @@ void AInGameMode::IsSucceedRespawnItem(SPAWNERPACKET& Packet) {
 
 void AInGameMode::SendJoinGameToServer() {
 	GAMEPACKET Packet;
+	memset(&Packet, 0, sizeof(Packet));
 
 	if (GetSocket() && m_GameInstance && m_GameInstance->IsValidLowLevel()) {
 		Packet.m_PacketType = EPACKETTYPE::EPT_PLAYER;
@@ -190,8 +223,14 @@ void AInGameMode::SendJoinGameToServer() {
 
 void AInGameMode::SendCharacterInformationToServer(const FVector& Location, const FRotator& Rotation, const FInputMotionData& Data) {
 	GAMEPACKET Packet;
+	RANK PlayerRankInformation;
+	memset(&Packet, 0, sizeof(Packet));
 
 	if (GetSocket() && m_Character && m_GameInstance && m_GameInstance->IsValidLowLevel()) {
+		PlayerRankInformation.m_CurrentSplinePoint = m_Character->m_CurrentSplinePoint;
+		PlayerRankInformation.m_SplinePointDistance = m_Character->m_SplinePointDistance;
+		
+		Packet.m_RankInformation = PlayerRankInformation;
 		Packet.m_PacketType = EPACKETTYPE::EPT_PLAYER;
 		Packet.m_MessageType = EPACKETMESSAGEFORGAMETYPE::EPMGT_UPDATE;
 		Packet.m_SessionID = m_GameInstance->GetSessionID();
@@ -207,6 +246,7 @@ void AInGameMode::SendCharacterInformationToServer(const FVector& Location, cons
 
 void AInGameMode::SendDisconnectToServer() {
 	GAMEPACKET Packet;
+	memset(&Packet, 0, sizeof(Packet));
 
 	if (GetSocket() && m_GameInstance && m_GameInstance->IsValidLowLevel()) {
 		Packet.m_PacketType = EPACKETTYPE::EPT_PLAYER;
@@ -222,6 +262,7 @@ void AInGameMode::SendDisconnectToServer() {
 void AInGameMode::SendStartGame() {
 	if (!m_bIsInGame) {
 		GAMEPACKET Packet;
+		memset(&Packet, 0, sizeof(Packet));
 
 		if (GetSocket() && IsValid(m_GameInstance)) {
 			Packet.m_PacketType = EPACKETTYPE::EPT_PLAYER;
@@ -234,8 +275,28 @@ void AInGameMode::SendStartGame() {
 	}
 }
 
+void AInGameMode::SendChangeReadyState() {
+	if (!m_bIsInGame) {
+		GAMEPACKET Packet;
+		memset(&Packet, 0, sizeof(Packet));
+
+		if (GetSocket() && IsValid(m_GameInstance)) {
+			Packet.m_PacketType = EPACKETTYPE::EPT_PLAYER;
+			Packet.m_MessageType = EPACKETMESSAGEFORGAMETYPE::EPMGT_READY;
+			Packet.m_SessionID = m_GameInstance->GetSessionID();
+			Packet.m_UniqueKey = m_GameInstance->GetUniqueKey();
+			Packet.m_bIsReady = !m_bIsReady;
+			Packet.m_Socket = m_SocketNumber;
+
+			GetSocket()->Send((ANSICHAR*)&Packet, sizeof(GAMEPACKET));
+		}
+	}
+}
+
 void AInGameMode::SendRespawnItemToServer(const int32 & SpawnerID, const int32 & ItemIndex) {
 	GAMEPACKET Packet;
+	memset(&Packet, 0, sizeof(Packet));
+
 	if (GetSocket() && IsValid(m_GameInstance)) {
 		Packet.m_PacketType = EPACKETTYPE::EPT_SPAWNER;
 		Packet.m_MessageType = EPACKETMESSAGEFORGAMETYPE::EPMGT_SPAWNITEM;
@@ -272,7 +333,7 @@ AActor* AInGameMode::FindSpawnPointByUniqueKey(const int32& UniqueKey) {
 	return SpawnPoint;
 }
 
-void AInGameMode::SpawnPawnAndAddCharacterList(ADefaultVehicleCharacter* NewPawn, const int32& UniqueKey, const ANSICHAR* PlayerName, const int32& CurrentIndex) {
+void AInGameMode::SpawnPawnAndAddCharacterList(ADefaultVehicleCharacter* NewPawn, const int32& UniqueKey, const ANSICHAR* PlayerName, const int32& PlayerRank) {
 	if (!m_Character && UniqueKey == m_GameInstance->GetUniqueKey()) {
 		if (Cast<AHANSEIRacingController>(GetWorld()->GetFirstPlayerController()) && GetWorld()->GetFirstPlayerController()->GetPawn()) {
 			Cast<AHANSEIRacingController>(GetWorld()->GetFirstPlayerController())->LocationSendTimerStart(this);
@@ -285,11 +346,12 @@ void AInGameMode::SpawnPawnAndAddCharacterList(ADefaultVehicleCharacter* NewPawn
 	else {
 		NewPawn->SpawnDefaultController();
 	}
+
 	if (PlayerName) {
 		NewPawn->SetPlayerName(FString(PlayerName));
 	}
-	NewPawn->SetMaterialFromUniqueKey(CurrentIndex);
-	NewPawn->SetPlayerRank(CurrentIndex + 1);
+	NewPawn->SetMaterialFromUniqueKey(UniqueKey);
+	NewPawn->SetPlayerRank(PlayerRank);
 	m_CharacterClass.Add(TPairInitializer<int32, ADefaultVehicleCharacter*>(UniqueKey, NewPawn));
 }
 
@@ -306,7 +368,7 @@ void AInGameMode::SpawnCharacter() {
 				auto NewPawn = GetWorld()->SpawnActor<ADefaultVehicleCharacter>(ADefaultVehicleCharacter::StaticClass(), Location, Rotation, Param);
 
 				if (NewPawn) {
-					SpawnPawnAndAddCharacterList(NewPawn, m_PlayerList[i].m_UniqueKey, m_PlayerList[i].m_PlayerNickName, i);
+					SpawnPawnAndAddCharacterList(NewPawn, m_PlayerList[i].m_UniqueKey, m_PlayerList[i].m_PlayerNickName, m_PlayerList[i].m_RankInformation.m_CurrentRank);
 
 					if (m_CharacterClass.Num() == m_PlayerList.size()) {
 						if (IsValid(m_InGameWidget)) {
@@ -335,30 +397,35 @@ void AInGameMode::TeleportCharacters() {
 	m_bIsTeleport = false;
 }
 
-void AInGameMode::ResetPlayerCurrentRank(const int32& UniqueKey, const int32& TargetRank) {
-	for (auto It : m_CharacterClass) {
-		if (It.Key != UniqueKey && It.Value->GetPlayerCurrentRank() > TargetRank) {
-			It.Value->SetPlayerRank(It.Value->GetPlayerCurrentRank() - 1);
-		}
-	}
-}
-
 uint8* AInGameMode::RecvBufferShiftProcess(uint8* RecvBuffer, const int32& PacketSize, const int32& CurrentCount) {
 	return RecvBuffer + (PacketSize * CurrentCount);
 }
 
 void AInGameMode::UpdatePlayerLocationAndRotation() {
 	if (m_GameInstance && m_GameInstance->IsValidLowLevel()) {
+		bool bIsUpdateRank = false;
+
 		for (auto It : m_PlayerList) {
-			if (It.m_UniqueKey != m_GameInstance->GetUniqueKey()) {
-				auto Character = m_CharacterClass.Find(It.m_UniqueKey);
-				FVector Location(It.m_Location.x, It.m_Location.y, It.m_Location.z);
-				FRotator Rotation(It.m_Rotation.x, It.m_Rotation.y, It.m_Rotation.z);
-				if (Character != nullptr) {
+			auto Character = m_CharacterClass.Find(It.m_UniqueKey);
+			if (Character && IsValid(*Character)) {
+				if (It.m_UniqueKey != m_GameInstance->GetUniqueKey()) {
+					FVector Location(It.m_Location.x, It.m_Location.y, It.m_Location.z);
+					FRotator Rotation(It.m_Rotation.x, It.m_Rotation.y, It.m_Rotation.z);
+
 					(*Character)->SetActorLocationAndRotation(Location, FQuat(Rotation), false, nullptr, ETeleportType::TeleportPhysics);
 					(*Character)->SetVehicleState(It.m_VehicleData);
 				}
+
+				if ((*Character)->GetPlayerCurrentRank() != It.m_RankInformation.m_CurrentRank) {
+					UE_LOG(LogTemp, Warning, L"QWE");
+					(*Character)->SetPlayerRank(It.m_RankInformation.m_CurrentRank);
+					bIsUpdateRank = true;
+				}
 			}
+		}
+
+		if (bIsUpdateRank && IsValid(m_InGameWidget)) {
+			m_InGameWidget->SetCharacterClassData(m_CharacterClass);
 		}
 	}
 }
