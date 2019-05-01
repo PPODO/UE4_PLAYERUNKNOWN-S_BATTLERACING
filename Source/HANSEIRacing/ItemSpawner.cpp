@@ -34,7 +34,7 @@ void AItemSpawner::BeginPlay() {
 		UChildActorComponent* ChildActorComp = NewObject<UChildActorComponent>(this, UChildActorComponent::StaticClass());
 		if (IsValid(ChildActorComp)) {
 			FVector SpawnLocation = FVector((100.f / (m_MaxItemSpawnCount)) * (i - (m_MaxItemSpawnCount / 2)) + ((25.f / (m_MaxItemSpawnCount / 2)) * (m_MaxItemSpawnCount % 2 == 0 ? 1 : 0)), 0.f, 100.f);
-			ChildActorComp->AttachTo(RootComponent);
+			ChildActorComp->AttachToComponent(RootComponent, FAttachmentTransformRules(EAttachmentRule::KeepRelative, false));
 			ChildActorComp->SetChildActorClass(AItemBox::StaticClass());
 			ChildActorComp->SetRelativeLocation(SpawnLocation);
 			ChildActorComp->SetRelativeRotation(FRotator(0.f));

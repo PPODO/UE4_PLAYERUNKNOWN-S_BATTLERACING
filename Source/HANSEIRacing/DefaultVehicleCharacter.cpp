@@ -150,6 +150,7 @@ void ADefaultVehicleCharacter::Tick(float DeltaTime) {
 		if (m_bIsDisconnect) {
 			Destroy();
 		}
+
 		if (IsValid(m_PlayerName) && !m_PlayerName->bHiddenInGame) {
 			if (IsValid(GetWorld()->GetFirstPlayerController()) && IsValid(GetWorld()->GetFirstPlayerController()->GetPawn())) {
 				FVector Location = GetWorld()->GetFirstPlayerController()->GetPawn()->GetActorLocation();
@@ -157,7 +158,7 @@ void ADefaultVehicleCharacter::Tick(float DeltaTime) {
 			}
 		}
 
-/*		if (!m_bIsPlayer && GetVehicleMovement()) {
+		if (!m_bIsPlayer && GetVehicleMovement()) {
 			GetVehicleMovement()->SetThrottleInput(m_VehicleState.m_Throttle);
 			GetVehicleMovement()->SetSteeringInput(m_VehicleState.m_Steering);
 			GetVehicleMovement()->SetHandbrakeInput(m_VehicleState.m_HandBreak);
@@ -191,7 +192,6 @@ void ADefaultVehicleCharacter::SetupPlayerInputComponent(UInputComponent* Player
 
 	PlayerInputComponent->BindAction("HandBreak", IE_Pressed, this, &ADefaultVehicleCharacter::PressedHandBreak);
 	PlayerInputComponent->BindAction("HandBreak", IE_Released, this, &ADefaultVehicleCharacter::ReleaseHandBreak);
-	PlayerInputComponent->BindAction("ReadyAndStart", IE_Pressed, this, &ADefaultVehicleCharacter::PresseedStartGame);
 }
 
 void ADefaultVehicleCharacter::MoveForward(float Value) {
@@ -208,12 +208,6 @@ void ADefaultVehicleCharacter::PressedHandBreak() {
 
 void ADefaultVehicleCharacter::ReleaseHandBreak() {
 	GetVehicleMovementComponent()->SetHandbrakeInput(false);
-}
-
-void ADefaultVehicleCharacter::PresseedStartGame() {
-	if (IsValid(m_GameMode)) {
-		m_GameMode->SendStartGame();
-	}
 }
 
 void ADefaultVehicleCharacter::SetPlayerName(const FString& Text) {

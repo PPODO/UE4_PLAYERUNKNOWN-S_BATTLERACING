@@ -19,12 +19,6 @@ protected:
 	virtual void PossessedBy(class AController* NewController) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-public:
-	UPROPERTY(BlueprintReadWrite)
-		int32 m_CurrentSplinePoint = 0;
-	UPROPERTY(BlueprintReadWrite)
-		float m_SplinePointDistance;
-
 private:
 	UFUNCTION()
 		void MoveForward(float Value);
@@ -35,8 +29,6 @@ private:
 		void PressedHandBreak();
 	UFUNCTION()
 		void ReleaseHandBreak();
-	UFUNCTION()
-		void PresseedStartGame();
 
 private:
 	UPROPERTY()

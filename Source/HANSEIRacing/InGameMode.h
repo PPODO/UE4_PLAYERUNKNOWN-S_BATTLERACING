@@ -8,6 +8,7 @@
 #include "InGameMode.generated.h"
 
 static const int32 NickNameMaxLen = 15;
+static const int32 MaxLabCount = 3;
 
 UENUM(BlueprintType)
 enum class EPACKETMESSAGEFORGAMETYPE : uint8 {
@@ -131,36 +132,51 @@ protected:
 	virtual void BeginDestroy() override;
 
 private:
+	TArray<class AActor*> m_SpawnPoint;
+	TArray<class AActor*> m_ItemSpawners;
+	TMap<int32, class ADefaultVehicleCharacter*> m_CharacterClass;
+
 	class UInGameWidget* m_InGameWidget;
 	class ULobbyWidget* m_LobbyWidget;
 	class UHANSEIRacingGameInstance* m_GameInstance;
 	class ADefaultVehicleCharacter* m_Character;
-	TArray<class AActor*> m_SpawnPoint;
-	TArray<class AActor*> m_StartPoint;
-	TArray<class AActor*> m_ItemSpawners;
-	TMap<int32, class ADefaultVehicleCharacter*> m_CharacterClass;
-	bool m_bIsSpawnPlayer;
 	UINT_PTR m_SocketNumber;
 
 private:
-	bool m_bIsInGame, m_bIsTeleport;
-	bool m_bIsLeader, m_bIsReady;
+	UPROPERTY()
+		class USoundCue* m_LobbySoundCue;
+	UPROPERTY()
+		class UAudioComponent* m_LobbySoundComponent;
+	UPROPERTY()
+		class USoundCue* m_InGameSoundCue;
+	UPROPERTY()
+		class UAudioComponent* m_InGameSoundComponent;
+
+private:
+	bool m_bIsHaveToSpawnPlayer;
+	bool m_bIsLeader;
+	bool m_bIsReady;
+	bool m_bIsInGame;
+	bool m_bChangeGameSetting;
 
 private:
 	std::vector<GAMEPACKET> m_PlayerList;
 	std::queue<PACKET*> m_PacketQueue;
 
 private:
-	uint8* RecvBufferShiftProcess(uint8* RecvBuffer, const int32& PacketSize, const int32& CurrentCount);
+	void ChangeGameSetting();
 	void UpdatePlayerLocationAndRotation();
 	void SpawnCharacter();
-	void TeleportCharacters();
 
 private:
 	// INLINE Function
-	FORCEINLINE int32 CalculatePacketSize(const PACKET* Packet);
-	FORCEINLINE AActor* FindSpawnPointByUniqueKey(const int32& UniqueKey);
+	FORCEINLINE uint8* RecvBufferShiftProcess(uint8* RecvBuffer, const int32& PacketSize, const int32& CurrentCount);
+	FORCEINLINE int32 GetPacketSize(const PACKET* Packet);
+	FORCEINLINE AActor** FindSpawnPointByUniqueKey(const int32& UniqueKey);
 	FORCEINLINE void SpawnPawnAndAddCharacterList(class ADefaultVehicleCharacter* NewPawn, const int32& UniqueKey, const ANSICHAR* PlayerName, const int32& PlayerRank);
+	FORCEINLINE void ChangePossessState();
+	FORCEINLINE void ChangeWidgetVisibility();
+	FORCEINLINE void ChangeBackGroundSound();
 
 public:
 	// FROM Server
@@ -177,17 +193,17 @@ public:
 	void SendJoinGameToServer();
 	void SendCharacterInformationToServer(const FVector& Location, const FRotator& Rotation, const struct FInputMotionData& Data);
 	void SendDisconnectToServer();
-	void SendStartGame();
 	void SendRespawnItemToServer(const int32& SpawnerID, const int32& ItemIndex);
 
 public:
 	UFUNCTION(BlueprintCallable)
 		void SendChangeReadyState();
+	UFUNCTION(BlueprintCallable)
+		void SendStartGame();
 
 public:
 	UFUNCTION(BlueprintCallable)
 		void SetInGameWidgetClass(class UInGameWidget* Widget) { if (Widget) { m_InGameWidget = Widget; } }
-
 	UFUNCTION(BlueprintCallable)
 		void SetLobbyWidgetClass(class ULobbyWidget* Widget) { if (Widget) { m_LobbyWidget = Widget; } }
 
@@ -195,4 +211,7 @@ public:
 	UFUNCTION(BlueprintCallable)
 		FORCEINLINE bool GetIsLeader() const { return m_bIsLeader; }
 
+public:
+	UPROPERTY(BlueprintReadWrite)
+		AActor* m_LobbyCamera;
 };

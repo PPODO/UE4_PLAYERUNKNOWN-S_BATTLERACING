@@ -2,11 +2,12 @@
 #include "DefaultVehicleCharacter.h"
 #include "DefaultCharacter.h"
 #include "InGameMode.h"
+#include "Components/SplineComponent.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 
-AHANSEIRacingController::AHANSEIRacingController() : m_Character(nullptr), m_ControllerConnector(nullptr) {
-
+AHANSEIRacingController::AHANSEIRacingController() : m_Character(nullptr), m_ControllerConnector(nullptr), m_GameMode(nullptr), m_CurrentLab(1), m_CurrentSplinePoint(0), m_SplinePointDistance(0.f) {
+	
 }
 
 void AHANSEIRacingController::BeginPlay() {
@@ -16,6 +17,11 @@ void AHANSEIRacingController::BeginPlay() {
 	if (m_ControllerConnector && m_ControllerConnector->StartUDPReceiver()) {
 		m_ControllerConnector->GetUDPReceiver()->OnDataReceived().BindUObject(this, &AHANSEIRacingController::RecvControllerData);
 		m_ControllerConnector->GetUDPReceiver()->Start();
+	}
+
+	m_GameMode = Cast<AInGameMode>(GetWorld()->GetAuthGameMode());
+	if(!IsValid(m_GameMode)){
+		m_GameMode = Cast<AInGameMode>(GetWorld()->GetAuthGameMode());
 	}
 }
 
@@ -35,16 +41,16 @@ void AHANSEIRacingController::BeginDestroy() {
 		delete m_ControllerConnector;
 		m_ControllerConnector = nullptr;
 	}
-	if (m_TimerHandle.IsValid() && GetWorld()) {
-		GetWorld()->GetTimerManager().ClearTimer(m_TimerHandle);
-	}
+	StopLocationSendTimer();
 }
 
-void AHANSEIRacingController::LocationSendTimerStart(AGameModeBase* GM) {
+void AHANSEIRacingController::StartLocationSendTimer() {
 	GetWorld()->GetTimerManager().SetTimer(m_TimerHandle, this, &AHANSEIRacingController::IsItNearlyEqualActorInformation, 0.016f, true);
+}
 
-	if (GM) {
-		m_GameMode = Cast<AInGameMode>(GM);
+void AHANSEIRacingController::StopLocationSendTimer() {
+	if (m_TimerHandle.IsValid() && GetWorld()) {
+		GetWorld()->GetTimerManager().ClearTimer(m_TimerHandle);
 	}
 }
 
@@ -59,4 +65,28 @@ void AHANSEIRacingController::IsItNearlyEqualActorInformation() {
 
 void AHANSEIRacingController::RecvControllerData(const FArrayReaderPtr& Ptr, const FIPv4Endpoint & EndPoint) {
 	*Ptr << m_ControllerData;
+}
+
+void AHANSEIRacingController::ProcessingOverlapEvent(const int32& NumOfSplinePoint) {
+	if (m_CurrentSplinePoint + 1 > NumOfSplinePoint - 1) {
+		if (m_CurrentLab + 1 > MaxLabCount) {
+			// m_GameMode
+		}
+		m_CurrentLab++;
+	}
+	m_CurrentSplinePoint = (m_CurrentSplinePoint + 1) % NumOfSplinePoint;
+}
+
+int32 AHANSEIRacingController::CalculateSplineDistanceFromSplineComponent(USplineComponent* SplineClass) {
+	if (IsValid(SplineClass) && IsValid(GetPawn())) {
+		int32 NumOfSplinePoint = SplineClass->GetNumberOfSplinePoints();
+		FVector NextLocation = SplineClass->GetLocationAtSplinePoint(m_CurrentSplinePoint, ESplineCoordinateSpace::World);
+		FVector CurrentLocation = SplineClass->GetLocationAtSplinePoint(((m_CurrentSplinePoint - 1) + NumOfSplinePoint) % NumOfSplinePoint, ESplineCoordinateSpace::World);
+		FVector CharacterLocation = SplineClass->FindLocationClosestToWorldLocation(GetPawn()->GetActorLocation(), ESplineCoordinateSpace::World);
+
+		FVector SplineAndCharacterDistance = NextLocation - CharacterLocation;
+		FVector SplineDistance = NextLocation - CurrentLocation;
+		m_SplinePointDistance = FVector::DotProduct(SplineAndCharacterDistance, SplineDistance) / SplineDistance.SizeSquared();
+	}
+	return m_CurrentSplinePoint;
 }

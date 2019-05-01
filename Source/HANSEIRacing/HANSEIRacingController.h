@@ -22,7 +22,8 @@ public:
 
 
 public:
-	void LocationSendTimerStart(class AGameModeBase* GM);
+	void StartLocationSendTimer();
+	void StopLocationSendTimer();
 
 private:
 	UFUNCTION()
@@ -41,8 +42,23 @@ private:
 
 private:
 	FTimerHandle m_TimerHandle;
+	int32 m_CurrentLab;
+	int32 m_CurrentSplinePoint;
+	float m_SplinePointDistance;
+
+public:
+	UFUNCTION(BlueprintCallable)
+		void ProcessingOverlapEvent(const int32& NumOfSplinePoint);
+	UFUNCTION(BlueprintCallable)
+		int32 CalculateSplineDistanceFromSplineComponent(class USplineComponent* SplineClass);
 
 public:
 	FORCEINLINE struct FInputMotionData GetControllerData() const { return m_ControllerData; }
+	FORCEINLINE int32 GetCurrentSplinePoint() const { return m_CurrentSplinePoint; }
+	FORCEINLINE float GetSplinePointDistance() const { return m_SplinePointDistance; }
+
+public:
+	UFUNCTION(BlueprintCallable)
+		FORCEINLINE int32 GetCurrentLab() const { return m_CurrentLab; }
 
 };
