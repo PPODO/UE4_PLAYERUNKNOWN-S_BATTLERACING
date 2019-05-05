@@ -11,15 +11,31 @@
 #include "Sound/SoundCue.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "TimerManager.h"
 #include "ConstructorHelpers.h"
 #include <algorithm>
 
-AInGameMode::AInGameMode() : m_InGameWidget(nullptr), m_LobbyWidget(nullptr), m_GameInstance(nullptr), m_Character(nullptr), m_LobbySoundComponent(nullptr), m_InGameSoundComponent(nullptr), m_bIsHaveToSpawnPlayer(false), m_bIsLeader(false), m_bIsReady(false), m_bIsInGame(false), m_bChangeGameSetting(true), m_SocketNumber(0), m_LobbyCamera(nullptr) {
-	ConstructorHelpers::FObjectFinder<USoundCue> LobbyBG(L"SoundCue'/Game/Sound/InGameTheme/LobbyTheme_Cue.LobbyTheme_Cue'");
-	ConstructorHelpers::FObjectFinder<USoundCue> InGameBG(L"SoundCue'/Game/Sound/InGameTheme/GameMusic/Music1_Cue.Music1_Cue'");
+AInGameMode::AInGameMode() : m_InGameWidget(nullptr), m_LobbyWidget(nullptr), m_GameInstance(nullptr), m_Character(nullptr), m_LobbySoundComponent(nullptr), m_InGameSoundComponent(nullptr), m_bIsHaveToSpawnPlayer(false), m_bIsLeader(false), m_bIsReady(false), m_bIsInGame(false), m_bChangeGameSetting(true), m_bIsSucceedStartGame(false), m_SocketNumber(0), m_LobbyCamera(nullptr) {
+	ConstructorHelpers::FObjectFinder<USoundCue> LobbyBG(L"SoundCue'/Game/Sound/InGameTheme/LobbyTheme/LobbyTheme_Cue.LobbyTheme_Cue'");
+	ConstructorHelpers::FObjectFinder<USoundCue> LobbyBG1(L"SoundCue'/Game/Sound/InGameTheme/LobbyTheme/LobbyTheme2_Cue.LobbyTheme2_Cue'");
+	ConstructorHelpers::FObjectFinder<USoundCue> LobbyBG2(L"SoundCue'/Game/Sound/InGameTheme/LobbyTheme/LobbyTheme3_Cue.LobbyTheme3_Cue'");
+	ConstructorHelpers::FObjectFinder<USoundCue> LobbyBG3(L"SoundCue'/Game/Sound/InGameTheme/LobbyTheme/LobbyTheme4_Cue.LobbyTheme4_Cue'");
 
-	if (LobbyBG.Succeeded()) { m_LobbySoundCue = LobbyBG.Object; }
-	if (InGameBG.Succeeded()) { m_InGameSoundCue = InGameBG.Object; }
+	ConstructorHelpers::FObjectFinder<USoundCue> InGameBG(L"SoundCue'/Game/Sound/InGameTheme/GameMusic/InGame_Theme_Cue.InGame_Theme_Cue'");
+	ConstructorHelpers::FObjectFinder<USoundCue> InGameBG1(L"SoundCue'/Game/Sound/InGameTheme/GameMusic/InGame_2_Theme_Cue.InGame_2_Theme_Cue'");
+	ConstructorHelpers::FObjectFinder<USoundCue> InGameBG2(L"SoundCue'/Game/Sound/InGameTheme/GameMusic/InGame_3_Theme_Cue.InGame_3_Theme_Cue'");
+
+	if (LobbyBG.Succeeded() && LobbyBG1.Succeeded() && LobbyBG2.Succeeded() && LobbyBG3.Succeeded()) {
+		m_LobbySoundCues.Add(LobbyBG.Object);
+		m_LobbySoundCues.Add(LobbyBG1.Object);
+		m_LobbySoundCues.Add(LobbyBG2.Object);
+		m_LobbySoundCues.Add(LobbyBG3.Object);
+	}
+	if (InGameBG.Succeeded() && InGameBG1.Succeeded() && InGameBG2.Succeeded()) {
+		m_InGameSoundCues.Add(InGameBG.Object);
+		m_InGameSoundCues.Add(InGameBG1.Object);
+		m_InGameSoundCues.Add(InGameBG2.Object);
+	}
 
 	PlayerControllerClass = AHANSEIRacingController::StaticClass();
 
@@ -35,8 +51,6 @@ void AInGameMode::BeginPlay() {
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), APlayerStart::StaticClass(), m_SpawnPoint);
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AItemSpawner::StaticClass(), m_ItemSpawners);
 
-	m_LobbySoundComponent = UGameplayStatics::SpawnSound2D(GetWorld(), m_LobbySoundCue);
-
 	m_GameInstance = Cast<UHANSEIRacingGameInstance>(GetGameInstance());
 	if(!m_GameInstance){
 		m_GameInstance = Cast<UHANSEIRacingGameInstance>(GetGameInstance());
@@ -48,14 +62,22 @@ void AInGameMode::Tick(float DeltaTime) {
 	ABaseGameMode::Tick(DeltaTime);
 
 	if (IsInGameThread()) {
-		if (m_bIsHaveToSpawnPlayer) {
-			SpawnCharacter();
-		}
 		if (m_bChangeGameSetting) {
 			ChangeGameSetting();
 		}
+
 		if (m_bIsInGame) {
+			if (m_bIsSucceedStartGame) {
+				GetWorld()->GetTimerManager().SetTimer(m_StartGameTimer, this, &AInGameMode::StartGameTimerDelegate, 5.f, false);
+				m_bIsSucceedStartGame = false;
+			}
+
 			UpdatePlayerLocationAndRotation();
+		}
+		else {
+			if (m_bIsHaveToSpawnPlayer) {
+				SpawnCharacter();
+			}
 		}
 	}
 }
@@ -103,7 +125,10 @@ void AInGameMode::RecvDataProcessing(uint8* RecvBuffer, int32& RecvBytes) {
 			case EPACKETMESSAGEFORGAMETYPE::EPMGT_UPDATE:
 				IsSucceedUpdatePlayerInformation(*static_cast<GAMEPACKET*>(Packet));
 				break;
-			case EPACKETMESSAGEFORGAMETYPE::EPMGT_STARTGAME:
+			case EPACKETMESSAGEFORGAMETYPE::EPMGT_POSSESS:
+				IsSucceedPossessingVehicle(*static_cast<GAMEPACKET*>(Packet));
+				break;
+			case EPACKETMESSAGEFORGAMETYPE::EPMGT_START:
 				IsSucceedStartGame(*static_cast<GAMEPACKET*>(Packet));
 				break;
 			case EPACKETMESSAGEFORGAMETYPE::EPMGT_READY:
@@ -180,9 +205,15 @@ void AInGameMode::IsSucceedUpdatePlayerInformation(GAMEPACKET& Packet) {
 	}
 }
 
-void AInGameMode::IsSucceedStartGame(GAMEPACKET& Packet) {
+void AInGameMode::IsSucceedPossessingVehicle(GAMEPACKET& Packet) {
 	if (Packet.m_FailedReason == EPACKETFAILEDTYPE::EPFT_SUCCEED) {
 		m_bChangeGameSetting = m_bIsInGame = true;
+	}
+}
+
+void AInGameMode::IsSucceedStartGame(GAMEPACKET& Packet) {
+	if (Packet.m_FailedReason == EPACKETFAILEDTYPE::EPFT_SUCCEED) {
+		m_bIsSucceedStartGame = true;
 	}
 }
 
@@ -220,6 +251,20 @@ void AInGameMode::IsSucceedRespawnItem(SPAWNERPACKET& Packet) {
 }
 
 // TO Server
+
+void AInGameMode::SendCanStartToServer() {
+	GAMEPACKET Packet;
+	memset(&Packet, 0, sizeof(Packet));
+
+	if (GetSocket() && m_GameInstance && m_GameInstance->IsValidLowLevel()) {
+		Packet.m_PacketType = EPACKETTYPE::EPT_PLAYER;
+		Packet.m_MessageType = EPACKETMESSAGEFORGAMETYPE::EPMGT_START;
+		Packet.m_SessionID = m_GameInstance->GetSessionID();
+		Packet.m_Socket = m_SocketNumber;
+
+		GetSocket()->Send((char*)&Packet, sizeof(GAMEPACKET));
+	}
+}
 
 void AInGameMode::SendJoinGameToServer() {
 	GAMEPACKET Packet;
@@ -275,14 +320,14 @@ void AInGameMode::SendDisconnectToServer() {
 	}
 }
 
-void AInGameMode::SendStartGame() {
+void AInGameMode::SendPossessTheVehicleToServer() {
 	if (!m_bIsInGame) {
 		GAMEPACKET Packet;
 		memset(&Packet, 0, sizeof(Packet));
 
 		if (GetSocket() && IsValid(m_GameInstance)) {
 			Packet.m_PacketType = EPACKETTYPE::EPT_PLAYER;
-			Packet.m_MessageType = EPACKETMESSAGEFORGAMETYPE::EPMGT_STARTGAME;
+			Packet.m_MessageType = EPACKETMESSAGEFORGAMETYPE::EPMGT_POSSESS;
 			Packet.m_SessionID = m_GameInstance->GetSessionID();
 			Packet.m_Socket = m_SocketNumber;
 
@@ -291,7 +336,7 @@ void AInGameMode::SendStartGame() {
 	}
 }
 
-void AInGameMode::SendChangeReadyState() {
+void AInGameMode::SendChangeReadyStateToServer() {
 	if (!m_bIsInGame) {
 		GAMEPACKET Packet;
 		memset(&Packet, 0, sizeof(Packet));
@@ -356,11 +401,10 @@ void AInGameMode::SpawnCharacter() {
 
 void AInGameMode::ChangeGameSetting() {
 	if (m_bChangeGameSetting) {
-		ChangePossessState();
-		ChangeBackGroundSound();
-		ChangeWidgetVisibility();
-
-		m_bChangeGameSetting = false;
+		if (ChangePossessState() && ChangeWidgetVisibility() && ChangeBackGroundSound()) {
+			SendCanStartToServer();
+			m_bChangeGameSetting = false;
+		}
 	}
 }
 
@@ -392,6 +436,16 @@ void AInGameMode::UpdatePlayerLocationAndRotation() {
 	}
 }
 
+void AInGameMode::StartGameTimerDelegate() {
+	auto Controller = Cast<AHANSEIRacingController>(GetWorld()->GetFirstPlayerController());
+	if (IsValid(Controller)) {
+		FInputModeGameOnly GameInput;
+		Controller->SetInputMode(GameInput);
+
+		GEngine->AddOnScreenDebugMessage(1, 5.f, FColor::Red, L"Succeed Start!");
+	}
+}
+
 // Inline Private Function
 
 uint8* AInGameMode::RecvBufferShiftProcess(uint8* RecvBuffer, const int32& PacketSize, const int32& CurrentCount) {
@@ -411,7 +465,7 @@ int32 AInGameMode::GetPacketSize(const PACKET* Packet) {
 AActor** AInGameMode::FindSpawnPointByUniqueKey(const int32& UniqueKey) {
 	auto SpawnPoint = m_SpawnPoint.FindByPredicate([this, &UniqueKey](const AActor* Actor) {
 		auto PlayerStart = Cast<APlayerStart>(Actor);
-		if (IsValid(PlayerStart) && PlayerStart->PlayerStartTag.Compare(*FString::Printf(L"%d", (UniqueKey & m_SpawnPoint.Num()))) == 0) {
+		if (IsValid(PlayerStart) && PlayerStart->PlayerStartTag.Compare(*FString::Printf(L"%d", (UniqueKey % m_SpawnPoint.Num()))) == 0) {
 			return true;
 		}
 		return false;
@@ -436,7 +490,7 @@ void AInGameMode::SpawnPawnAndAddCharacterList(ADefaultVehicleCharacter* NewPawn
 	m_CharacterClass.Add(TPairInitializer<int32, ADefaultVehicleCharacter*>(UniqueKey, NewPawn));
 }
 
-void AInGameMode::ChangePossessState() {
+bool AInGameMode::ChangePossessState() {
 	auto Controller = Cast<AHANSEIRacingController>(GetWorld()->GetFirstPlayerController());
 
 	if (m_bIsInGame) {
@@ -448,6 +502,8 @@ void AInGameMode::ChangePossessState() {
 			Controller->Possess(m_Character);
 			Controller->bShowMouseCursor = false;
 			Controller->StartLocationSendTimer();
+
+			return true;
 		}
 	}
 	else {
@@ -457,17 +513,35 @@ void AInGameMode::ChangePossessState() {
 			Controller->SetInputMode(UIInput);
 			Controller->bShowMouseCursor = true;
 			Controller->StopLocationSendTimer();
+
+			return true;
 		}
 	}
+	return false;
 }
 
-void AInGameMode::ChangeWidgetVisibility() {
+bool AInGameMode::ChangeWidgetVisibility() {
 	if (IsValid(m_InGameWidget) && IsValid(m_LobbyWidget)) {
 		m_LobbyWidget->SetVisibility(m_bIsInGame ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 		m_InGameWidget->SetVisibility(m_bIsInGame ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+
+		return true;
 	}
+	return false;
 }
 
-void AInGameMode::ChangeBackGroundSound() {
-	
+bool AInGameMode::ChangeBackGroundSound() {
+	if (m_bIsInGame) {
+		if (IsValid(m_LobbySoundComponent)) {
+			m_LobbySoundComponent->Stop();
+		}
+		m_InGameSoundComponent = UGameplayStatics::SpawnSound2D(GetWorld(), m_InGameSoundCues[FMath::RandRange(0, m_InGameSoundCues.Num() - 1)]);
+	}
+	else {
+		if (IsValid(m_InGameSoundComponent)) {
+			m_InGameSoundComponent->Stop();
+		}
+		m_LobbySoundComponent = UGameplayStatics::SpawnSound2D(GetWorld(), m_LobbySoundCues[FMath::RandRange(0, m_LobbySoundCues.Num() - 1)]);
+	}
+	return true;
 }

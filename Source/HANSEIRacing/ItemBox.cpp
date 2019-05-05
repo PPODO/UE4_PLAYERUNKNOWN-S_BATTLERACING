@@ -3,10 +3,12 @@
 #include "InGameMode.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialInstance.h"
 #include "ConstructorHelpers.h"
 
-AItemBox::AItemBox() : m_GameMode(nullptr) {
+AItemBox::AItemBox() : m_GameMode(nullptr), m_bIsReset(false) {
 	ConstructorHelpers::FObjectFinder<UStaticMesh> MeshObject(L"StaticMesh'/Engine/BasicShapes/Cube.Cube'");
+	ConstructorHelpers::FObjectFinder<UMaterialInstance> Material(L"MaterialInstanceConstant'/Game/Materials/GT_Free2018/Materials/M_Carpet_ThroneRoom_Inst.M_Carpet_ThroneRoom_Inst'");
 
 	m_BoxCollisionComponent = CreateDefaultSubobject<UBoxComponent>("Item Box Collision Component");
 	if (m_BoxCollisionComponent) {
@@ -18,7 +20,7 @@ AItemBox::AItemBox() : m_GameMode(nullptr) {
 		RootComponent = m_BoxCollisionComponent;
 	}
 
-	if (MeshObject.Succeeded()) {
+	if (MeshObject.Succeeded() && Material.Succeeded()) {
 		m_ItemBoxMesh = CreateDefaultSubobject<UStaticMeshComponent>("Item Box Mesh Component");
 		if (m_ItemBoxMesh) {
 			m_ItemBoxMesh->SetupAttachment(m_BoxCollisionComponent);
@@ -26,6 +28,7 @@ AItemBox::AItemBox() : m_GameMode(nullptr) {
 			m_ItemBoxMesh->SetRelativeLocation(FVector(0.f));
 			m_ItemBoxMesh->SetRelativeRotation(FRotator(0.f));
 			m_ItemBoxMesh->SetStaticMesh(MeshObject.Object);
+			m_ItemBoxMesh->SetMaterial(0, Material.Object);
 		}
 	}
 	PrimaryActorTick.bCanEverTick = true;
@@ -47,8 +50,14 @@ void AItemBox::BeginPlay() {
 void AItemBox::Tick(float DeltaTime) {
 	Super::Tick(DeltaTime);
 
-	if (IsValid(m_BoxCollisionComponent)) {
-//		m_BoxCollisionComponent->AddRelativeRotation(FQuat(m_RotateDirection));
+	if (IsInGameThread()) {
+		if (m_bIsReset && IsValid(m_BoxCollisionComponent)) {
+			ResetItemBox();
+		}
+
+		if (IsValid(m_BoxCollisionComponent)) {
+			m_BoxCollisionComponent->AddRelativeRotation(FQuat(m_RotateDirection));
+		}
 	}
 }
 
@@ -67,8 +76,7 @@ void AItemBox::OnComponentOverlapBegin(UPrimitiveComponent * OverlappedComponent
 }
 
 void AItemBox::ResetItemBox() {
-	if (IsValid(m_BoxCollisionComponent)) {
-		m_BoxCollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-		SetActorHiddenInGame(false);
-	}
+	m_BoxCollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	SetActorHiddenInGame(false);
+	m_bIsReset = false;
 }

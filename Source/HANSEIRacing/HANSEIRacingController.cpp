@@ -6,7 +6,7 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 
-AHANSEIRacingController::AHANSEIRacingController() : m_Character(nullptr), m_ControllerConnector(nullptr), m_GameMode(nullptr), m_CurrentLab(1), m_CurrentSplinePoint(0), m_SplinePointDistance(0.f) {
+AHANSEIRacingController::AHANSEIRacingController() : m_Character(nullptr), m_ControllerConnector(nullptr), m_GameMode(nullptr), m_CurrentLap(1), m_CurrentSplinePoint(0), m_SplinePointDistance(0.f) {
 	
 }
 
@@ -69,10 +69,10 @@ void AHANSEIRacingController::RecvControllerData(const FArrayReaderPtr& Ptr, con
 
 void AHANSEIRacingController::ProcessingOverlapEvent(const int32& NumOfSplinePoint) {
 	if (m_CurrentSplinePoint + 1 > NumOfSplinePoint - 1) {
-		if (m_CurrentLab + 1 > MaxLabCount) {
+		if (m_CurrentLap + 1 > MaxLapCount) {
 			// m_GameMode
 		}
-		m_CurrentLab++;
+		m_CurrentLap++;
 	}
 	m_CurrentSplinePoint = (m_CurrentSplinePoint + 1) % NumOfSplinePoint;
 }

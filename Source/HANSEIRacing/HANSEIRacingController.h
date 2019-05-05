@@ -42,7 +42,7 @@ private:
 
 private:
 	FTimerHandle m_TimerHandle;
-	int32 m_CurrentLab;
+	int32 m_CurrentLap;
 	int32 m_CurrentSplinePoint;
 	float m_SplinePointDistance;
 
@@ -59,6 +59,6 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable)
-		FORCEINLINE int32 GetCurrentLab() const { return m_CurrentLab; }
+		FORCEINLINE int32 GetCurrentLap() const { return m_CurrentLap; }
 
 };

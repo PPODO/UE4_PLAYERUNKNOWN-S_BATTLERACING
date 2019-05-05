@@ -38,6 +38,7 @@ ADefaultVehicleCharacter::ADefaultVehicleCharacter() : m_Controller(nullptr), m_
 	if (MeshObject.Succeeded() && AnimInstance.Succeeded()) {
 		GetMesh()->SetSkeletalMesh(MeshObject.Object);
 		GetMesh()->SetAnimInstanceClass(AnimInstance.Class);
+		GetMesh()->SetCenterOfMass(FVector(0.f, 0.f, -30.f));
 	}
 
 	if (EngineSoundCue.Succeeded()) {
@@ -163,12 +164,12 @@ void ADefaultVehicleCharacter::Tick(float DeltaTime) {
 			GetVehicleMovement()->SetSteeringInput(m_VehicleState.m_Steering);
 			GetVehicleMovement()->SetHandbrakeInput(m_VehicleState.m_HandBreak);
 		}
-/*		else if (m_Controller && m_bIsPlayer && GetVehicleMovementComponent()) {
-			FInputMotionData ControllerData = m_Controller->GetControllerData();
+		else if (m_Controller && m_bIsPlayer && GetVehicleMovementComponent()) {
+/*			FInputMotionData ControllerData = m_Controller->GetControllerData();
 			GetVehicleMovementComponent()->SetThrottleInput(ControllerData.m_Throttle);
 			GetVehicleMovementComponent()->SetSteeringInput(ControllerData.m_Steering);
-			GetVehicleMovementComponent()->SetHandbrakeInput(ControllerData.m_HandBreak);
-		}*/
+			GetVehicleMovementComponent()->SetHandbrakeInput(ControllerData.m_HandBreak);*/
+		}
 
 		if (IsValid(m_EngineSoundComponent)) {
 			float RPMToAudioScale = 2500.0f / GetVehicleMovement()->GetEngineMaxRotationSpeed();

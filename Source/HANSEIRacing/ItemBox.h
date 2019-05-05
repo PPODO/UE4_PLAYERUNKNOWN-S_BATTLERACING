@@ -32,11 +32,13 @@ private:
 private:
 	FRotator m_RotateDirection;
 	int32 m_IndexNumber;
+	bool m_bIsReset;
 
-public:
+private:
 	void ResetItemBox();
 
 public:
 	FORCEINLINE void SetIndexNumber(const int32& NewIndex) { m_IndexNumber = NewIndex; }
+	FORCEINLINE void SetResetItemBox(const bool& bIsReset) { m_bIsReset = bIsReset; }
 
 };

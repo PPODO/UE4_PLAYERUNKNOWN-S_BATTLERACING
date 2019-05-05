@@ -3,19 +3,22 @@
 #include "InGameMode.h"
 #include "Components/StaticMeshComponent.h"
 #include "ConstructorHelpers.h"
+#include "Materials/MaterialInstance.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 
 AItemSpawner::AItemSpawner() {
 	ConstructorHelpers::FObjectFinder<UStaticMesh> MeshObject(L"StaticMesh'/Engine/BasicShapes/Cube.Cube'");
+	ConstructorHelpers::FObjectFinder<UMaterialInstance> Material(L"MaterialInstanceConstant'/Game/Materials/GT_Free2018/Materials/M_Carpet_GeoDesign_Inst.M_Carpet_GeoDesign_Inst'");
 
-	if (MeshObject.Succeeded()) {
+	if (MeshObject.Succeeded() && Material.Succeeded()) {
 		m_BoardMesh = CreateDefaultSubobject<UStaticMeshComponent>("Item Board Mesh");
 		if (m_BoardMesh) {
 			m_BoardMesh->SetRelativeLocation(FVector(0.f, 0.f, 0.f));
 			m_BoardMesh->SetRelativeRotation(FRotator(0.f, 0.f, 0.f));
 			m_BoardMesh->SetWorldScale3D(FVector(1.f));
 			m_BoardMesh->SetStaticMesh(MeshObject.Object);
+			m_BoardMesh->SetMaterial(0, Material.Object);
 			SetRootComponent(m_BoardMesh);
 		}
 	}
@@ -55,7 +58,7 @@ void AItemSpawner::FindItemIndexAndReset(const int32& ItemIndex) {
 	if (ItemIndex >= 0 && ItemIndex < m_ItemBoxActors.Num()) {
 		auto ItemBoxActor = Cast<AItemBox>(m_ItemBoxActors[ItemIndex]->GetChildActor());
 		if (IsValid(ItemBoxActor)) {
-			ItemBoxActor->ResetItemBox();
+			ItemBoxActor->SetResetItemBox(true);
 		}
 	}
 }

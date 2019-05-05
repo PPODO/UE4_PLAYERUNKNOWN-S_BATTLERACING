@@ -66,7 +66,7 @@ void FSocketComponent::ConnectToServer(class ABaseGameMode* GM, int32 Port, cons
 	}
 
 	m_Address = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateInternetAddr();
-	m_Address->SetIp(L"172.30.1.22", bIsValid);
+	m_Address->SetIp(L"172.30.1.35", bIsValid);
 	m_Address->SetPort(Port);
 
 	m_Socket = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->CreateSocket(NAME_None, SocketName, false);
@@ -79,8 +79,8 @@ void FSocketComponent::ConnectToServer(class ABaseGameMode* GM, int32 Port, cons
 	}
 }
 
-void FSocketComponent::DisconnectSocket() {
-	std::unique_lock<std::mutex> Lock(m_Lock);
+	void FSocketComponent::DisconnectSocket() {
+		std::unique_lock<std::mutex> Lock(m_Lock);
 	if (m_Socket && m_Socket->GetConnectionState() == ESocketConnectionState::SCS_Connected) {
 		if (m_Socket->Shutdown(ESocketShutdownMode::ReadWrite) && m_Socket->Close()) {
 			ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM)->DestroySocket(m_Socket);

@@ -8,14 +8,15 @@
 #include "InGameMode.generated.h"
 
 static const int32 NickNameMaxLen = 15;
-static const int32 MaxLabCount = 3;
+static const int32 MaxLapCount = 3;
 
 UENUM(BlueprintType)
 enum class EPACKETMESSAGEFORGAMETYPE : uint8 {
 	EPMGT_JOIN,
 	EPMGT_UPDATE,
 	EPMGT_DISCONNECT,
-	EPMGT_STARTGAME,
+	EPMGT_POSSESS,
+	EPMGT_START,
 	EPMGT_READY,
 	EPMGT_SPAWNITEM,
 	EPMGT_NEWPLAYER,
@@ -79,10 +80,10 @@ struct RANK {
 	int m_CurrentRank;
 	int m_CurrentSplinePoint;
 	float m_SplinePointDistance;
-	int m_CurrentLab;
+	int m_CurrentLap;
 
 public:
-	RANK() : m_CurrentRank(0), m_CurrentSplinePoint(0), m_SplinePointDistance(0.f), m_CurrentLab(0) {};
+	RANK() : m_CurrentRank(0), m_CurrentSplinePoint(0), m_SplinePointDistance(0.f), m_CurrentLap(0) {};
 
 };
 
@@ -140,15 +141,16 @@ private:
 	class ULobbyWidget* m_LobbyWidget;
 	class UHANSEIRacingGameInstance* m_GameInstance;
 	class ADefaultVehicleCharacter* m_Character;
+	struct FTimerHandle m_StartGameTimer;
 	UINT_PTR m_SocketNumber;
 
 private:
 	UPROPERTY()
-		class USoundCue* m_LobbySoundCue;
+		TArray<class USoundCue*> m_LobbySoundCues;
 	UPROPERTY()
 		class UAudioComponent* m_LobbySoundComponent;
 	UPROPERTY()
-		class USoundCue* m_InGameSoundCue;
+		TArray<class USoundCue*> m_InGameSoundCues;
 	UPROPERTY()
 		class UAudioComponent* m_InGameSoundComponent;
 
@@ -158,6 +160,7 @@ private:
 	bool m_bIsReady;
 	bool m_bIsInGame;
 	bool m_bChangeGameSetting;
+	bool m_bIsSucceedStartGame;
 
 private:
 	std::vector<GAMEPACKET> m_PlayerList;
@@ -174,9 +177,13 @@ private:
 	FORCEINLINE int32 GetPacketSize(const PACKET* Packet);
 	FORCEINLINE AActor** FindSpawnPointByUniqueKey(const int32& UniqueKey);
 	FORCEINLINE void SpawnPawnAndAddCharacterList(class ADefaultVehicleCharacter* NewPawn, const int32& UniqueKey, const ANSICHAR* PlayerName, const int32& PlayerRank);
-	FORCEINLINE void ChangePossessState();
-	FORCEINLINE void ChangeWidgetVisibility();
-	FORCEINLINE void ChangeBackGroundSound();
+	FORCEINLINE bool ChangePossessState();
+	FORCEINLINE bool ChangeWidgetVisibility();
+	FORCEINLINE bool ChangeBackGroundSound();
+
+private:
+	UFUNCTION()
+		void StartGameTimerDelegate();
 
 public:
 	// FROM Server
@@ -184,12 +191,16 @@ public:
 	void IsSucceedJoinGameNewPlayer(GAMEPACKET& Packet);
 	void IsSucceedDisconnectOtherPlayer(GAMEPACKET& Packet);
 	void IsSucceedUpdatePlayerInformation(GAMEPACKET& Packet);
+	void IsSucceedPossessingVehicle(GAMEPACKET& Packet);
 	void IsSucceedStartGame(GAMEPACKET& Packet);
 	void IsSucceedChangeReadyState(GAMEPACKET& Packet);
 	void IsSucceedRespawnItem(SPAWNERPACKET& Packet);
 
-public:
+private:
 	// TO Server
+	FORCEINLINE void SendCanStartToServer();
+
+public:
 	void SendJoinGameToServer();
 	void SendCharacterInformationToServer(const FVector& Location, const FRotator& Rotation, const struct FInputMotionData& Data);
 	void SendDisconnectToServer();
@@ -197,9 +208,9 @@ public:
 
 public:
 	UFUNCTION(BlueprintCallable)
-		void SendChangeReadyState();
+		void SendChangeReadyStateToServer();
 	UFUNCTION(BlueprintCallable)
-		void SendStartGame();
+		void SendPossessTheVehicleToServer();
 
 public:
 	UFUNCTION(BlueprintCallable)
