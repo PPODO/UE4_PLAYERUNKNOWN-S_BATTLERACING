@@ -12,6 +12,7 @@
 #include "Components/InputComponent.h"
 #include "Components/AudioComponent.h"
 #include "Kismet/KismetMathLibrary.h"
+#include "Kismet/GameplayStatics.h"
 #include "GameFramework/Character.h"
 #include "Camera/CameraComponent.h"
 #include "ConstructorHelpers.h"
@@ -21,9 +22,14 @@
 ADefaultVehicleCharacter::ADefaultVehicleCharacter() : m_Controller(nullptr), m_bIsPlayer(false), m_bIsDisconnect(false), m_GameMode(nullptr) {
 	AIControllerClass = APlayerController::StaticClass();
 
+	ConstructorHelpers::FObjectFinder<UMaterial> DecalMaterial(L"Material'/Game/Materials/Decal/DecalMaterial.DecalMaterial'");
 	ConstructorHelpers::FObjectFinder<USkeletalMesh> MeshObject(L"SkeletalMesh'/Game/Vehicle/Vehicle_SkelMesh.Vehicle_SkelMesh'");
 	ConstructorHelpers::FObjectFinder<USoundCue> EngineSoundCue(L"SoundCue'/Game/Vehicle/Sound/Engine_Loop_Cue.Engine_Loop_Cue'");
 	ConstructorHelpers::FClassFinder<UAnimInstance> AnimInstance(L"'/Game/Vehicle/VehicleAnimationBlueprint'");
+
+	if (DecalMaterial.Succeeded()) {
+		m_DecalMaterial = DecalMaterial.Object;
+	}
 	
 	m_ReferenceSrcs.Add(L"'/Game/Materials/AutomotiveMaterials/Materials/Metal/MI_Metal_Chrome_03_Dark.MI_Metal_Chrome_03_Dark'");
 	m_ReferenceSrcs.Add(L"'/Game/Materials/AutomotiveMaterials/Materials/CaliperPaint/MI_Caliper_Silver.MI_Caliper_Silver'");
@@ -38,7 +44,6 @@ ADefaultVehicleCharacter::ADefaultVehicleCharacter() : m_Controller(nullptr), m_
 	if (MeshObject.Succeeded() && AnimInstance.Succeeded()) {
 		GetMesh()->SetSkeletalMesh(MeshObject.Object);
 		GetMesh()->SetAnimInstanceClass(AnimInstance.Class);
-		GetMesh()->SetCenterOfMass(FVector(0.f, 0.f, -30.f));
 	}
 
 	if (EngineSoundCue.Succeeded()) {
@@ -134,6 +139,10 @@ ADefaultVehicleCharacter::ADefaultVehicleCharacter() : m_Controller(nullptr), m_
 void ADefaultVehicleCharacter::BeginPlay() {
 	Super::BeginPlay();
 
+	if (GetMesh()) {
+		GetMesh()->SetCenterOfMass(FVector(0.f, 0.f, -30.f), "Vehicle");
+	}
+
 	if (IsValid(m_EngineSoundComponent)) {
 		m_EngineSoundComponent->Play();
 	}
@@ -152,23 +161,26 @@ void ADefaultVehicleCharacter::Tick(float DeltaTime) {
 			Destroy();
 		}
 
-		if (IsValid(m_PlayerName) && !m_PlayerName->bHiddenInGame) {
-			if (IsValid(GetWorld()->GetFirstPlayerController()) && IsValid(GetWorld()->GetFirstPlayerController()->GetPawn())) {
-				FVector Location = GetWorld()->GetFirstPlayerController()->GetPawn()->GetActorLocation();
-				m_PlayerName->SetWorldRotation(UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), Location));
-			}
-		}
-
 		if (!m_bIsPlayer && GetVehicleMovement()) {
-			GetVehicleMovement()->SetThrottleInput(m_VehicleState.m_Throttle);
+/*			GetVehicleMovement()->SetThrottleInput(m_VehicleState.m_Throttle);
 			GetVehicleMovement()->SetSteeringInput(m_VehicleState.m_Steering);
-			GetVehicleMovement()->SetHandbrakeInput(m_VehicleState.m_HandBreak);
+			GetVehicleMovement()->SetHandbrakeInput(m_VehicleState.m_HandBreak);*/
 		}
 		else if (m_Controller && m_bIsPlayer && GetVehicleMovementComponent()) {
 /*			FInputMotionData ControllerData = m_Controller->GetControllerData();
 			GetVehicleMovementComponent()->SetThrottleInput(ControllerData.m_Throttle);
 			GetVehicleMovementComponent()->SetSteeringInput(ControllerData.m_Steering);
-			GetVehicleMovementComponent()->SetHandbrakeInput(ControllerData.m_HandBreak);*/
+			GetVehicleMovementComponent()->SetHandbrakeInput(ControllerData.m_HandBreak);
+*/		}
+
+		SpawnTireDecal();
+
+		if (IsValid(m_PlayerName) && !m_PlayerName->bHiddenInGame) {
+			APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
+			if (IsValid(PlayerController) && IsValid(PlayerController->GetPawn())) {
+				FVector Location = PlayerController->GetPawn()->GetActorLocation();
+				m_PlayerName->SetWorldRotation(UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), Location));
+			}
 		}
 
 		if (IsValid(m_EngineSoundComponent)) {
@@ -217,6 +229,26 @@ void ADefaultVehicleCharacter::SetPlayerName(const FString& Text) {
 		m_PlayerName->SetHiddenInGame(m_bIsPlayer);
 	}
 	m_PlayerNickName = Text;
+}
+
+void ADefaultVehicleCharacter::SpawnTireDecal() {
+	IsDrifting("PhysWheel_FR", 22.5f);
+	IsDrifting("PhysWheel_FL", 22.5f);
+	IsDrifting("PhysWheel_BR", 17.5f);
+	IsDrifting("PhysWheel_BL", 17.5f);
+}
+
+void ADefaultVehicleCharacter::IsDrifting(const FName & SocketName, const float & Angle) {
+	if (IsValid(GetMesh()) && IsValid(m_DecalMaterial)) {
+		FVector LinearVelocity = GetMesh()->GetPhysicsLinearVelocityAtPoint(GetMesh()->GetSocketLocation(SocketName), SocketName);
+		FTransform SocketTransform = GetMesh()->GetSocketTransform(SocketName);
+		FVector InverseDirection = UKismetMathLibrary::InverseTransformDirection(SocketTransform, LinearVelocity);
+		InverseDirection.Normalize();
+
+		if (UKismetMathLibrary::InRange_FloatFloat(UKismetMathLibrary::Abs((UKismetMathLibrary::DegAcos(FVector::DotProduct(FVector(0.f, 1.f, 0.f), InverseDirection)) - 90)), Angle, 85.f)) {
+			UGameplayStatics::SpawnDecalAtLocation(GetWorld(), m_DecalMaterial, FVector(10.f), SocketTransform.GetLocation() - FVector(0.f, 0.f, 18.f), FRotator(0.f, 0.f, SocketTransform.GetRotation().Z));
+		}
+	}
 }
 
 void ADefaultVehicleCharacter::SetMaterialFromUniqueKey(const int32& Index) {

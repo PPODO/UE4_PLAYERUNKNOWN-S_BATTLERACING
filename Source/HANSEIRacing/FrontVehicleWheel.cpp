@@ -8,7 +8,11 @@ UFrontVehicleWheel::UFrontVehicleWheel() {
 	SteerAngle = 40.f;
 	bAffectedByHandbrake = false;
 
-	SuspensionForceOffset = -4.f;
+	LatStiffMaxLoad = 2.25f;
+	LatStiffValue = 5.5f;
+	LongStiffValue = 1000.f;
+
+	SuspensionForceOffset = -15.f;
 	SuspensionMaxRaise = 8.f;
 	SuspensionMaxDrop = 12.f;
 	SuspensionNaturalFrequency = 9.f;

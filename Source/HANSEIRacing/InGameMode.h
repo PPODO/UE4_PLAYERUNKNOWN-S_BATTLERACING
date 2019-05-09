@@ -5,6 +5,7 @@
 #include "BaseGameMode.h"
 #include <vector>
 #include <queue>
+#include <mutex>
 #include "InGameMode.generated.h"
 
 static const int32 NickNameMaxLen = 15;
@@ -19,6 +20,9 @@ enum class EPACKETMESSAGEFORGAMETYPE : uint8 {
 	EPMGT_START,
 	EPMGT_READY,
 	EPMGT_SPAWNITEM,
+	EPMGT_STARTCOUNTING,
+	EPMGT_REDZONESTART,
+	EPMGT_REDZONEEND,
 	EPMGT_NEWPLAYER,
 	EPMGT_DISCONNECTOTHER,
 	EPMGT_COUNT
@@ -136,9 +140,8 @@ private:
 	TArray<class AActor*> m_SpawnPoint;
 	TArray<class AActor*> m_ItemSpawners;
 	TMap<int32, class ADefaultVehicleCharacter*> m_CharacterClass;
+	TSubclassOf<class ADefaultVehicleCharacter> m_VehicleClass;
 
-	class UInGameWidget* m_InGameWidget;
-	class ULobbyWidget* m_LobbyWidget;
 	class UHANSEIRacingGameInstance* m_GameInstance;
 	class ADefaultVehicleCharacter* m_Character;
 	struct FTimerHandle m_StartGameTimer;
@@ -155,12 +158,23 @@ private:
 		class UAudioComponent* m_InGameSoundComponent;
 
 private:
-	bool m_bIsHaveToSpawnPlayer;
-	bool m_bIsLeader;
-	bool m_bIsReady;
+	TSubclassOf<class ULobbyWidget> m_LobbyWidgetClass;
+	TSubclassOf<class UInGameWidget> m_InGameWidgetClass;
+
+	UPROPERTY()
+		class UInGameWidget* m_InGameWidget;
+	UPROPERTY()
+		class ULobbyWidget* m_LobbyWidget;
+
+private:
 	bool m_bIsInGame;
+	bool m_bIsHaveToSpawnPlayer;
 	bool m_bChangeGameSetting;
 	bool m_bIsSucceedStartGame;
+
+private:
+	bool m_bIsLeader;
+	bool m_bIsReady;
 
 private:
 	std::vector<GAMEPACKET> m_PlayerList;
@@ -180,10 +194,8 @@ private:
 	FORCEINLINE bool ChangePossessState();
 	FORCEINLINE bool ChangeWidgetVisibility();
 	FORCEINLINE bool ChangeBackGroundSound();
-
-private:
-	UFUNCTION()
-		void StartGameTimerDelegate();
+	FORCEINLINE void RefreshLobbyWidgetData();
+	FORCEINLINE void RefreshInGameWidgetData();
 
 public:
 	// FROM Server
@@ -211,12 +223,6 @@ public:
 		void SendChangeReadyStateToServer();
 	UFUNCTION(BlueprintCallable)
 		void SendPossessTheVehicleToServer();
-
-public:
-	UFUNCTION(BlueprintCallable)
-		void SetInGameWidgetClass(class UInGameWidget* Widget) { if (Widget) { m_InGameWidget = Widget; } }
-	UFUNCTION(BlueprintCallable)
-		void SetLobbyWidgetClass(class ULobbyWidget* Widget) { if (Widget) { m_LobbyWidget = Widget; } }
 
 public:
 	UFUNCTION(BlueprintCallable)

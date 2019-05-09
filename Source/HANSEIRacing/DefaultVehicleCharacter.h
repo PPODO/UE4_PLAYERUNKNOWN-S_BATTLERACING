@@ -39,6 +39,8 @@ private:
 		class UTextRenderComponent* m_PlayerName;
 	UPROPERTY()
 		class UAudioComponent* m_EngineSoundComponent;
+	UPROPERTY()
+		class UMaterial* m_DecalMaterial;
 
 private:
 	TArray<class UMaterialInstance*> m_MaterialInstances;
@@ -54,6 +56,12 @@ private:
 	FString m_PlayerNickName;
 	bool m_bIsDisconnect;
 	bool m_bIsPlayer;
+
+private:
+	void SpawnTireDecal();
+
+private:
+	FORCEINLINE void IsDrifting(const FName& SocketName, const float& Angle);
 
 public:
 	FORCEINLINE void SetIsItPlayer(bool b) { m_bIsPlayer = b; }

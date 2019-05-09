@@ -1,26 +1,37 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #include "RedZoneSpawner.h"
+#include "BombProjectile.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 
-// Sets default values
-ARedZoneSpawner::ARedZoneSpawner()
-{
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+ARedZoneSpawner::ARedZoneSpawner() {
+	m_BombProjectileClass = ABombProjectile::StaticClass();
+
 	PrimaryActorTick.bCanEverTick = true;
-
 }
 
-// Called when the game starts or when spawned
-void ARedZoneSpawner::BeginPlay()
-{
+void ARedZoneSpawner::BeginPlay() {
 	Super::BeginPlay();
-	
+
+	GetWorld()->GetTimerManager().SetTimer(m_SpawnProjectileTimerHandle, this, &ARedZoneSpawner::SpawnProjectileCallbackFunction, 1.f, true, 0.f);
 }
 
-// Called every frame
-void ARedZoneSpawner::Tick(float DeltaTime)
-{
+void ARedZoneSpawner::Tick(float DeltaTime) {
 	Super::Tick(DeltaTime);
-
 }
 
+void ARedZoneSpawner::BeginDestroy() {
+	Super::BeginDestroy();
+
+	if (GetWorld() && m_SpawnProjectileTimerHandle.IsValid()) {
+		GetWorld()->GetTimerManager().ClearTimer(m_SpawnProjectileTimerHandle);
+	}
+}
+
+void ARedZoneSpawner::SpawnProjectileCallbackFunction() {
+	int32 SpawnCount = FMath::RandRange(2, 5);
+	for (int32 i = 0; i < SpawnCount; i++) {
+		FActorSpawnParameters Param;
+		Param.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		GetWorld()->SpawnActor<ABombProjectile>(m_BombProjectileClass, FVector(FMath::FRandRange(-200.f, 200.f), FMath::FRandRange(-200.f, 200.f), 1000.f), FRotator(-90.f, 0.f, 0.f), Param);
+	}
+}

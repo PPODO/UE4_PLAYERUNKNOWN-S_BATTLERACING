@@ -15,7 +15,9 @@
 #include "ConstructorHelpers.h"
 #include <algorithm>
 
-AInGameMode::AInGameMode() : m_InGameWidget(nullptr), m_LobbyWidget(nullptr), m_GameInstance(nullptr), m_Character(nullptr), m_LobbySoundComponent(nullptr), m_InGameSoundComponent(nullptr), m_bIsHaveToSpawnPlayer(false), m_bIsLeader(false), m_bIsReady(false), m_bIsInGame(false), m_bChangeGameSetting(true), m_bIsSucceedStartGame(false), m_SocketNumber(0), m_LobbyCamera(nullptr) {
+AInGameMode::AInGameMode() : m_InGameWidgetClass(nullptr), m_InGameWidget(nullptr), m_LobbyWidgetClass(nullptr), m_LobbyWidget(nullptr), m_GameInstance(nullptr), m_Character(nullptr), m_LobbySoundComponent(nullptr), m_InGameSoundComponent(nullptr), m_bIsHaveToSpawnPlayer(false), m_bIsLeader(false), m_bIsReady(false), m_bIsInGame(false), m_bChangeGameSetting(true), m_bIsSucceedStartGame(false), m_SocketNumber(0), m_LobbyCamera(nullptr) {
+	ConstructorHelpers::FClassFinder<ADefaultVehicleCharacter> VehicleClass(L"Blueprint'/Game/BluePrint/Vehicle/BP_DefaultVehicleCharacter.BP_DefaultVehicleCharacter_C'");
+
 	ConstructorHelpers::FObjectFinder<USoundCue> LobbyBG(L"SoundCue'/Game/Sound/InGameTheme/LobbyTheme/LobbyTheme_Cue.LobbyTheme_Cue'");
 	ConstructorHelpers::FObjectFinder<USoundCue> LobbyBG1(L"SoundCue'/Game/Sound/InGameTheme/LobbyTheme/LobbyTheme2_Cue.LobbyTheme2_Cue'");
 	ConstructorHelpers::FObjectFinder<USoundCue> LobbyBG2(L"SoundCue'/Game/Sound/InGameTheme/LobbyTheme/LobbyTheme3_Cue.LobbyTheme3_Cue'");
@@ -24,6 +26,9 @@ AInGameMode::AInGameMode() : m_InGameWidget(nullptr), m_LobbyWidget(nullptr), m_
 	ConstructorHelpers::FObjectFinder<USoundCue> InGameBG(L"SoundCue'/Game/Sound/InGameTheme/GameMusic/InGame_Theme_Cue.InGame_Theme_Cue'");
 	ConstructorHelpers::FObjectFinder<USoundCue> InGameBG1(L"SoundCue'/Game/Sound/InGameTheme/GameMusic/InGame_2_Theme_Cue.InGame_2_Theme_Cue'");
 	ConstructorHelpers::FObjectFinder<USoundCue> InGameBG2(L"SoundCue'/Game/Sound/InGameTheme/GameMusic/InGame_3_Theme_Cue.InGame_3_Theme_Cue'");
+
+	ConstructorHelpers::FClassFinder<ULobbyWidget> LobbyWidget(L"WidgetBlueprint'/Game/UI/BP_LobbyWidget.BP_LobbyWidget_C'");
+	ConstructorHelpers::FClassFinder<UInGameWidget> InGameWidget(L"WidgetBlueprint'/Game/UI/BP_InGameUI.BP_InGameUI_C'");
 
 	if (LobbyBG.Succeeded() && LobbyBG1.Succeeded() && LobbyBG2.Succeeded() && LobbyBG3.Succeeded()) {
 		m_LobbySoundCues.Add(LobbyBG.Object);
@@ -36,6 +41,15 @@ AInGameMode::AInGameMode() : m_InGameWidget(nullptr), m_LobbyWidget(nullptr), m_
 		m_InGameSoundCues.Add(InGameBG1.Object);
 		m_InGameSoundCues.Add(InGameBG2.Object);
 	}
+	if (VehicleClass.Succeeded()) {
+		m_VehicleClass = VehicleClass.Class;
+	}
+	if (LobbyWidget.Succeeded()) {
+		m_LobbyWidgetClass = LobbyWidget.Class;
+	}
+	if (InGameWidget.Succeeded()) {
+		m_InGameWidgetClass = InGameWidget.Class;
+	}
 
 	PlayerControllerClass = AHANSEIRacingController::StaticClass();
 
@@ -47,6 +61,20 @@ AInGameMode::AInGameMode() : m_InGameWidget(nullptr), m_LobbyWidget(nullptr), m_
 
 void AInGameMode::BeginPlay() {
 	ABaseGameMode::BeginPlay();
+
+	if (m_LobbyWidgetClass) {
+		m_LobbyWidget = CreateWidget<ULobbyWidget>(GetWorld(), m_LobbyWidgetClass);
+		if (IsValidLowLevelFast(m_LobbyWidget)) {
+			m_LobbyWidget->AddToViewport();
+		}
+	}
+	if (m_InGameWidgetClass) {
+		m_InGameWidget = CreateWidget<UInGameWidget>(GetWorld(), m_InGameWidgetClass);
+		if (IsValidLowLevelFast(m_InGameWidget)) {
+			m_InGameWidget->AddToViewport();
+			m_InGameWidget->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
 
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), APlayerStart::StaticClass(), m_SpawnPoint);
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AItemSpawner::StaticClass(), m_ItemSpawners);
@@ -62,22 +90,27 @@ void AInGameMode::Tick(float DeltaTime) {
 	ABaseGameMode::Tick(DeltaTime);
 
 	if (IsInGameThread()) {
-		if (m_bChangeGameSetting) {
-			ChangeGameSetting();
-		}
-
 		if (m_bIsInGame) {
-			if (m_bIsSucceedStartGame) {
-				GetWorld()->GetTimerManager().SetTimer(m_StartGameTimer, this, &AInGameMode::StartGameTimerDelegate, 5.f, false);
+			if (m_bIsSucceedStartGame && IsValid(m_InGameWidget)) {
+				m_InGameWidget->SetCountdownTimer(5, L"START!", [this]() {
+					auto Controller = GetWorld()->GetFirstPlayerController();
+					if (IsValid(Controller)) {
+						FInputModeGameOnly GameInput;
+						Controller->SetInputMode(GameInput);
+					}
+				});
 				m_bIsSucceedStartGame = false;
 			}
-
 			UpdatePlayerLocationAndRotation();
 		}
 		else {
 			if (m_bIsHaveToSpawnPlayer) {
 				SpawnCharacter();
 			}
+		}
+
+		if (m_bChangeGameSetting) {
+			ChangeGameSetting();
 		}
 	}
 }
@@ -154,10 +187,7 @@ void AInGameMode::IsSucceedJoinGame(GAMEPACKET& Packet) {
 		m_SocketNumber = Packet.m_Socket;
 		m_PlayerList.push_back(Packet);
 		m_bIsHaveToSpawnPlayer = true;
-
-		if (IsValid(m_LobbyWidget)) {
-			m_LobbyWidget->SetPlayerList(m_PlayerList);
-		}
+		RefreshLobbyWidgetData();
 	}
 }
 
@@ -165,10 +195,7 @@ void AInGameMode::IsSucceedJoinGameNewPlayer(GAMEPACKET& Packet) {
 	if (Packet.m_FailedReason == EPACKETFAILEDTYPE::EPFT_SUCCEED) {
 		m_PlayerList.push_back(Packet);
 		m_bIsHaveToSpawnPlayer = true;
-
-		if (IsValid(m_LobbyWidget)) {
-			m_LobbyWidget->SetPlayerList(m_PlayerList);
-		}
+		RefreshLobbyWidgetData();
 	}
 }
 
@@ -182,16 +209,11 @@ void AInGameMode::IsSucceedDisconnectOtherPlayer(GAMEPACKET& Packet) {
 			m_CharacterClass.Remove(Packet.m_UniqueKey);
 		}
 
-		// Update Player List
 		if (m_bIsInGame) {
-			if (IsValid(m_InGameWidget)) {
-				m_InGameWidget->SetCharacterClassData(m_CharacterClass);
-			}
+			RefreshInGameWidgetData();
 		}
-		else {
-			if (IsValid(m_LobbyWidget)) {
-				m_LobbyWidget->SetPlayerList(m_PlayerList);
-			}
+		else{
+			RefreshLobbyWidgetData();
 		}
 	}
 }
@@ -221,12 +243,12 @@ void AInGameMode::IsSucceedChangeReadyState(GAMEPACKET& Packet) {
 	if (!m_bIsInGame) {
 		if (Packet.m_FailedReason == EPACKETFAILEDTYPE::EPFT_SUCCEED) {
 			auto Character = std::find_if(m_PlayerList.begin(), m_PlayerList.end(), [&](const GAMEPACKET& Data) -> bool { if (Data.m_UniqueKey == Packet.m_UniqueKey) { return true; } return false; });
-			if (Character != m_PlayerList.cend() && IsValid(m_LobbyWidget)) {
+			if (Character != m_PlayerList.cend()) {
 				if (Character->m_UniqueKey == m_GameInstance->GetUniqueKey()) {
 					m_bIsReady = Packet.m_bIsReady;
 				}
 				Character->m_bIsReady = Packet.m_bIsReady;
-				m_LobbyWidget->SetPlayerList(m_PlayerList);
+				RefreshLobbyWidgetData();
 			}
 		}
 	}
@@ -236,7 +258,7 @@ void AInGameMode::IsSucceedRespawnItem(SPAWNERPACKET& Packet) {
 	if (Packet.m_FailedReason == EPACKETFAILEDTYPE::EPFT_SUCCEED) {
 		if (Packet.m_ItemInformation.m_SpawnerID >= 0 && Packet.m_ItemInformation.m_SpawnerID < m_ItemSpawners.Num()) {
 			auto SpawnerActor = Cast<AItemSpawner>(*m_ItemSpawners.FindByPredicate([&](AActor* Actor) -> bool { 
-				if (IsValid(Actor) && IsValid(Cast<AItemSpawner>(Actor))) {
+				if (IsValid(Actor) && Actor->IsA<AItemSpawner>()) {
 					if (Cast<AItemSpawner>(Actor)->GetSpawnerUniqueID() == Packet.m_ItemInformation.m_SpawnerID) {
 						return true;
 					}
@@ -383,14 +405,12 @@ void AInGameMode::SpawnCharacter() {
 				FRotator Rotation = (*SpawnPoint)->GetActorRotation();
 				FActorSpawnParameters Param;
 				Param.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-				auto NewPawn = GetWorld()->SpawnActor<ADefaultVehicleCharacter>(ADefaultVehicleCharacter::StaticClass(), Location, Rotation, Param);
+				auto NewPawn = GetWorld()->SpawnActor<ADefaultVehicleCharacter>(m_VehicleClass, Location, Rotation, Param);
 
 				if (NewPawn) {
 					SpawnPawnAndAddCharacterList(NewPawn, m_PlayerList[i].m_UniqueKey, m_PlayerList[i].m_PlayerNickName, m_PlayerList[i].m_RankInformation.m_CurrentRank);
 					if (m_CharacterClass.Num() == m_PlayerList.size()) {
-						if (IsValid(m_InGameWidget)) {
-							m_InGameWidget->SetCharacterClassData(m_CharacterClass);
-						}
+						RefreshInGameWidgetData();
 						m_bIsHaveToSpawnPlayer = false;
 					}
 				}
@@ -402,7 +422,6 @@ void AInGameMode::SpawnCharacter() {
 void AInGameMode::ChangeGameSetting() {
 	if (m_bChangeGameSetting) {
 		if (ChangePossessState() && ChangeWidgetVisibility() && ChangeBackGroundSound()) {
-			SendCanStartToServer();
 			m_bChangeGameSetting = false;
 		}
 	}
@@ -430,19 +449,9 @@ void AInGameMode::UpdatePlayerLocationAndRotation() {
 			}
 		}
 
-		if (bIsUpdatedRank && IsValid(m_InGameWidget)) {
-			m_InGameWidget->SetCharacterClassData(m_CharacterClass);
+		if (bIsUpdatedRank) {
+			RefreshInGameWidgetData();
 		}
-	}
-}
-
-void AInGameMode::StartGameTimerDelegate() {
-	auto Controller = Cast<AHANSEIRacingController>(GetWorld()->GetFirstPlayerController());
-	if (IsValid(Controller)) {
-		FInputModeGameOnly GameInput;
-		Controller->SetInputMode(GameInput);
-
-		GEngine->AddOnScreenDebugMessage(1, 5.f, FColor::Red, L"Succeed Start!");
 	}
 }
 
@@ -502,12 +511,13 @@ bool AInGameMode::ChangePossessState() {
 			Controller->Possess(m_Character);
 			Controller->bShowMouseCursor = false;
 			Controller->StartLocationSendTimer();
+			SendCanStartToServer();
 
 			return true;
 		}
 	}
 	else {
-		if (IsValid(m_LobbyCamera) && IsValid(m_LobbyWidget) && IsValid(Controller)) {
+		if (IsValid(m_LobbyCamera) && IsValid(Controller)) {
 			FInputModeUIOnly UIInput;
 			Controller->SetViewTarget(m_LobbyCamera);
 			Controller->SetInputMode(UIInput);
@@ -544,4 +554,16 @@ bool AInGameMode::ChangeBackGroundSound() {
 		m_LobbySoundComponent = UGameplayStatics::SpawnSound2D(GetWorld(), m_LobbySoundCues[FMath::RandRange(0, m_LobbySoundCues.Num() - 1)]);
 	}
 	return true;
+}
+
+void AInGameMode::RefreshLobbyWidgetData() {
+	if (IsValidLowLevelFast(m_LobbyWidget)) {
+		m_LobbyWidget->SetPlayerList(m_PlayerList);
+	}
+}
+
+void AInGameMode::RefreshInGameWidgetData() {
+	if (IsValidLowLevelFast(m_InGameWidget)) {
+		m_InGameWidget->SetCharacterClassData(m_CharacterClass);
+	}
 }
