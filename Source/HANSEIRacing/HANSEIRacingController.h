@@ -27,7 +27,7 @@ public:
 
 private:
 	UFUNCTION()
-		void IsItNearlyEqualActorInformation();
+		void SendActorInformation();
 
 private:
 	void RecvControllerData(const FArrayReaderPtr& Ptr, const FIPv4Endpoint& EndPoint);

@@ -19,7 +19,7 @@
 #include "Sound/SoundCue.h"
 #include "Engine/Engine.h"
 
-ADefaultVehicleCharacter::ADefaultVehicleCharacter() : m_Controller(nullptr), m_bIsPlayer(false), m_bIsDisconnect(false), m_GameMode(nullptr) {
+ADefaultVehicleCharacter::ADefaultVehicleCharacter() : m_Controller(nullptr), m_bIsPlayer(false), m_bIsDisconnect(false), m_GameMode(nullptr), m_Health(100.f) {
 	AIControllerClass = APlayerController::StaticClass();
 
 	ConstructorHelpers::FObjectFinder<UMaterial> DecalMaterial(L"Material'/Game/Materials/Decal/DecalMaterial.DecalMaterial'");
@@ -155,9 +155,12 @@ void ADefaultVehicleCharacter::BeginPlay() {
 
 void ADefaultVehicleCharacter::Tick(float DeltaTime) {
 	Super::Tick(DeltaTime);
-
+	GEngine->AddOnScreenDebugMessage(1, 1.f, FColor::Red, FString::Printf(L"%f : %f", GetVehicleMovement()->GetEngineMaxRotationSpeed(), GetVehicleMovement()->GetEngineRotationSpeed()));
 	if (IsInGameThread()) {
 		if (m_bIsDisconnect) {
+			Destroy();
+		}
+		if (m_bIsDead) {
 			Destroy();
 		}
 
@@ -182,7 +185,6 @@ void ADefaultVehicleCharacter::Tick(float DeltaTime) {
 				m_PlayerName->SetWorldRotation(UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), Location));
 			}
 		}
-
 		if (IsValid(m_EngineSoundComponent)) {
 			float RPMToAudioScale = 2500.0f / GetVehicleMovement()->GetEngineMaxRotationSpeed();
 			m_EngineSoundComponent->SetFloatParameter("RPM", GetVehicleMovement()->GetEngineRotationSpeed() * RPMToAudioScale);
@@ -205,6 +207,17 @@ void ADefaultVehicleCharacter::SetupPlayerInputComponent(UInputComponent* Player
 
 	PlayerInputComponent->BindAction("HandBreak", IE_Pressed, this, &ADefaultVehicleCharacter::PressedHandBreak);
 	PlayerInputComponent->BindAction("HandBreak", IE_Released, this, &ADefaultVehicleCharacter::ReleaseHandBreak);
+}
+
+float ADefaultVehicleCharacter::TakeDamage(float DamageAmount, FDamageEvent const & DamageEvent, AController * EventInstigator, AActor * DamageCauser) {
+	DamageAmount = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	
+	if (m_bIsPlayer) {
+		if (m_Health > 0.f) {
+			m_Health -= DamageAmount;
+		}
+	}
+	return DamageAmount;
 }
 
 void ADefaultVehicleCharacter::MoveForward(float Value) {

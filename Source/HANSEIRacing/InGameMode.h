@@ -22,8 +22,8 @@ enum class EPACKETMESSAGEFORGAMETYPE : uint8 {
 	EPMGT_SPAWNITEM,
 	EPMGT_STARTCOUNTING,
 	EPMGT_REDZONESTART,
-	EPMGT_REDZONEEND,
 	EPMGT_NEWPLAYER,
+	EPMGT_RESPAWNPLAYER,
 	EPMGT_DISCONNECTOTHER,
 	EPMGT_COUNT
 };
@@ -31,6 +31,7 @@ enum class EPACKETMESSAGEFORGAMETYPE : uint8 {
 enum class EPACKETTYPE : uint8 {
 	EPT_PLAYER,
 	EPT_SPAWNER,
+	EPT_REDZONE,
 	EPT_COUNT
 };
 
@@ -97,6 +98,8 @@ struct GAMEPACKET : public PACKET {
 	VECTOR m_Location;
 	VECTOR m_Rotation;
 	struct FInputMotionData m_VehicleData;
+	float m_Health;
+	bool m_bIsDead;
 	bool m_bIsLeader;
 	bool m_bIsReady;
 	ITEM m_ItemInformation;
@@ -109,6 +112,8 @@ public:
 		this->m_Location = Data.m_Location;
 		this->m_Rotation = Data.m_Rotation;
 		this->m_VehicleData = Data.m_VehicleData;
+		this->m_Health = Data.m_Health;
+		this->m_bIsDead = Data.m_bIsDead;
 		this->m_ItemInformation = Data.m_ItemInformation;
 		this->m_RankInformation = Data.m_RankInformation;
 		this->m_bIsLeader = Data.m_bIsLeader;
@@ -119,6 +124,10 @@ public:
 
 struct SPAWNERPACKET : public PACKET {
 	ITEM m_ItemInformation;
+};
+
+struct REDZONEPACKET : public PACKET {
+	int32 m_SplinePoint;
 };
 
 UCLASS()
@@ -146,6 +155,7 @@ private:
 	class ADefaultVehicleCharacter* m_Character;
 	struct FTimerHandle m_StartGameTimer;
 	UINT_PTR m_SocketNumber;
+	float m_LastSendTime;
 
 private:
 	UPROPERTY()
@@ -165,6 +175,10 @@ private:
 		class UInGameWidget* m_InGameWidget;
 	UPROPERTY()
 		class ULobbyWidget* m_LobbyWidget;
+
+private:
+	UPROPERTY(BlueprintReadWrite, Meta = (AllowPrivateAccess = true))
+		class ARedZoneSpawner* m_RedZoneManager;
 
 private:
 	bool m_bIsInGame;
@@ -205,8 +219,10 @@ public:
 	void IsSucceedUpdatePlayerInformation(GAMEPACKET& Packet);
 	void IsSucceedPossessingVehicle(GAMEPACKET& Packet);
 	void IsSucceedStartGame(GAMEPACKET& Packet);
+	void IsSucceedRespawnPlayer(GAMEPACKET& Packet);
 	void IsSucceedChangeReadyState(GAMEPACKET& Packet);
 	void IsSucceedRespawnItem(SPAWNERPACKET& Packet);
+	void IsSucceedStartRedZone(REDZONEPACKET& Packet);
 
 private:
 	// TO Server
@@ -214,7 +230,7 @@ private:
 
 public:
 	void SendJoinGameToServer();
-	void SendCharacterInformationToServer(const FVector& Location, const FRotator& Rotation, const struct FInputMotionData& Data);
+	void SendCharacterInformationToServer(const FVector& Location, const FRotator& Rotation, const struct FInputMotionData& Data, const float& Health);
 	void SendDisconnectToServer();
 	void SendRespawnItemToServer(const int32& SpawnerID, const int32& ItemIndex);
 

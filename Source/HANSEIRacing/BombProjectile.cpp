@@ -1,4 +1,5 @@
 #include "BombProjectile.h"
+#include "DefaultVehicleCharacter.h"
 #include "ExplosionComponent.h"
 #include "Rocket.h"
 #include "Components/SphereComponent.h"
@@ -6,6 +7,7 @@
 #include "PhysicsEngine/RadialForceComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "GameFrameWork/DamageType.h"
 #include "ConstructorHelpers.h"
 
 ABombProjectile::ABombProjectile() : m_ProjectileSpeed(1000.f) {
@@ -16,7 +18,6 @@ ABombProjectile::ABombProjectile() : m_ProjectileSpeed(1000.f) {
 		m_SphereCollision->GetBodyInstance()->SetCollisionProfileName("Projectile");
 		m_SphereCollision->OnComponentHit.AddDynamic(this, &ABombProjectile::OnComponentHit);
 		m_SphereCollision->SetSphereRadius(50.f);
-		m_SphereCollision->SetHiddenInGame(false);
 		RootComponent = m_SphereCollision;
 	}
 
@@ -52,7 +53,7 @@ ABombProjectile::ABombProjectile() : m_ProjectileSpeed(1000.f) {
 	PrimaryActorTick.bCanEverTick = false;
 }
 
-void ABombProjectile::OnComponentHit(UPrimitiveComponent * HitComponent, AActor * OtherActor, UPrimitiveComponent * OtherComp, FVector NormalImpulse, const FHitResult & Hit) {
+void ABombProjectile::OnComponentHit(UPrimitiveComponent * HitComponent, AActor* OtherActor, UPrimitiveComponent * OtherComp, FVector NormalImpulse, const FHitResult & Hit) {
 	if (IsValid(m_RadialForceComponent)) {
 		m_RadialForceComponent->FireImpulse();
 	}
@@ -60,10 +61,10 @@ void ABombProjectile::OnComponentHit(UPrimitiveComponent * HitComponent, AActor 
 		if (m_RocketActorComponent && m_RocketActorComponent->GetChildActor()) {
 			m_RocketActorComponent->DestroyChildActor();
 		}
-		
 		if (IsValid(m_ExplosionComponent)) {
 			m_ExplosionComponent->Excute(GetActorLocation());
 		}
+		UGameplayStatics::ApplyRadialDamage(GetWorld(), 50.f, GetActorLocation(), m_RadialForceComponent->Radius * 2, UDamageType::StaticClass(), TArray<AActor*>(), this);
 		Destroy();
 	}
 }

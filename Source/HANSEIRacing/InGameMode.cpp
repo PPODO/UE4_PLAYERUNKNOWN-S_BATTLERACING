@@ -1,6 +1,7 @@
 #include "InGameMode.h"
 #include "ItemSpawner.h"
 #include "InGameWidget.h"
+#include "RedZoneSpawner.h"
 #include "LobbyWidget.h"
 #include "HANSEIRacingController.h"
 #include "HANSEIRacingGameInstance.h"
@@ -15,7 +16,7 @@
 #include "ConstructorHelpers.h"
 #include <algorithm>
 
-AInGameMode::AInGameMode() : m_InGameWidgetClass(nullptr), m_InGameWidget(nullptr), m_LobbyWidgetClass(nullptr), m_LobbyWidget(nullptr), m_GameInstance(nullptr), m_Character(nullptr), m_LobbySoundComponent(nullptr), m_InGameSoundComponent(nullptr), m_bIsHaveToSpawnPlayer(false), m_bIsLeader(false), m_bIsReady(false), m_bIsInGame(false), m_bChangeGameSetting(true), m_bIsSucceedStartGame(false), m_SocketNumber(0), m_LobbyCamera(nullptr) {
+AInGameMode::AInGameMode() : m_InGameWidgetClass(nullptr), m_InGameWidget(nullptr), m_LobbyWidgetClass(nullptr), m_LobbyWidget(nullptr), m_GameInstance(nullptr), m_Character(nullptr), m_LobbySoundComponent(nullptr), m_InGameSoundComponent(nullptr), m_bIsHaveToSpawnPlayer(false), m_bIsLeader(false), m_bIsReady(false), m_bIsInGame(false), m_bChangeGameSetting(true), m_bIsSucceedStartGame(false), m_SocketNumber(0), m_LobbyCamera(nullptr), m_RedZoneManager(nullptr) {
 	ConstructorHelpers::FClassFinder<ADefaultVehicleCharacter> VehicleClass(L"Blueprint'/Game/BluePrint/Vehicle/BP_DefaultVehicleCharacter.BP_DefaultVehicleCharacter_C'");
 
 	ConstructorHelpers::FObjectFinder<USoundCue> LobbyBG(L"SoundCue'/Game/Sound/InGameTheme/LobbyTheme/LobbyTheme_Cue.LobbyTheme_Cue'");
@@ -103,12 +104,10 @@ void AInGameMode::Tick(float DeltaTime) {
 			}
 			UpdatePlayerLocationAndRotation();
 		}
-		else {
-			if (m_bIsHaveToSpawnPlayer) {
-				SpawnCharacter();
-			}
-		}
 
+		if (m_bIsHaveToSpawnPlayer) {
+			SpawnCharacter();
+		}
 		if (m_bChangeGameSetting) {
 			ChangeGameSetting();
 		}
@@ -167,8 +166,14 @@ void AInGameMode::RecvDataProcessing(uint8* RecvBuffer, int32& RecvBytes) {
 			case EPACKETMESSAGEFORGAMETYPE::EPMGT_READY:
 				IsSucceedChangeReadyState(*static_cast<GAMEPACKET*>(Packet));
 				break;
+			case EPACKETMESSAGEFORGAMETYPE::EPMGT_RESPAWNPLAYER:
+				IsSucceedRespawnPlayer(*static_cast<GAMEPACKET*>(Packet));
+				break;
 			case EPACKETMESSAGEFORGAMETYPE::EPMGT_SPAWNITEM:
 				IsSucceedRespawnItem(*static_cast<SPAWNERPACKET*>(Packet));
+				break;
+			case EPACKETMESSAGEFORGAMETYPE::EPMGT_REDZONESTART:
+				IsSucceedStartRedZone(*static_cast<REDZONEPACKET*>(Packet));
 				break;
 			}
 		}
@@ -220,6 +225,8 @@ void AInGameMode::IsSucceedDisconnectOtherPlayer(GAMEPACKET& Packet) {
 
 void AInGameMode::IsSucceedUpdatePlayerInformation(GAMEPACKET& Packet) {
 	if (Packet.m_FailedReason == EPACKETFAILEDTYPE::EPFT_SUCCEED) {
+		GEngine->AddOnScreenDebugMessage(2, 1.f, FColor::Red, FString::Printf(L"Recv Time : %f", GetWorld()->GetRealTimeSeconds()));
+
 		auto Character = std::find_if(m_PlayerList.begin(), m_PlayerList.end(), [&](const GAMEPACKET& Data) -> bool { if (Data.m_UniqueKey == Packet.m_UniqueKey) { return true; } return false; });
 		if (Character != m_PlayerList.cend()) {
 			(*Character) = Packet;
@@ -236,6 +243,16 @@ void AInGameMode::IsSucceedPossessingVehicle(GAMEPACKET& Packet) {
 void AInGameMode::IsSucceedStartGame(GAMEPACKET& Packet) {
 	if (Packet.m_FailedReason == EPACKETFAILEDTYPE::EPFT_SUCCEED) {
 		m_bIsSucceedStartGame = true;
+	}
+}
+
+void AInGameMode::IsSucceedRespawnPlayer(GAMEPACKET & Packet) {
+	if (Packet.m_FailedReason == EPACKETFAILEDTYPE::EPFT_SUCCEED) {
+		auto Character = std::find_if(m_PlayerList.begin(), m_PlayerList.end(), [&](const GAMEPACKET& Data) -> bool { if (Data.m_UniqueKey == Packet.m_UniqueKey) { return true; } return false; });
+		if (Character != m_PlayerList.cend()) {
+			(*Character) = Packet;
+		}
+		m_bIsHaveToSpawnPlayer = true;
 	}
 }
 
@@ -272,6 +289,12 @@ void AInGameMode::IsSucceedRespawnItem(SPAWNERPACKET& Packet) {
 	}
 }
 
+void AInGameMode::IsSucceedStartRedZone(REDZONEPACKET& Packet) {
+	if (Packet.m_FailedReason == EPACKETFAILEDTYPE::EPFT_SUCCEED && IsValid(m_RedZoneManager)) {
+		m_RedZoneManager->SetActivateRedZone(true, Packet.m_SplinePoint);
+	}
+}
+
 // TO Server
 
 void AInGameMode::SendCanStartToServer() {
@@ -303,7 +326,7 @@ void AInGameMode::SendJoinGameToServer() {
 	}
 }
 
-void AInGameMode::SendCharacterInformationToServer(const FVector& Location, const FRotator& Rotation, const FInputMotionData& Data) {
+void AInGameMode::SendCharacterInformationToServer(const FVector& Location, const FRotator& Rotation, const FInputMotionData& Data, const float& Health) {
 	GAMEPACKET Packet;
 	RANK PlayerRankInformation;
 	auto Controller = Cast<AHANSEIRacingController>(IsValid(m_Character) ? m_Character->GetController() : nullptr);
@@ -322,8 +345,12 @@ void AInGameMode::SendCharacterInformationToServer(const FVector& Location, cons
 		Packet.m_Location = Location;
 		Packet.m_Rotation = Rotation;
 		Packet.m_VehicleData = Data;
+		Packet.m_Health = Health;
 
 		GetSocket()->Send((char*)&Packet, sizeof(GAMEPACKET));
+
+		m_LastSendTime = GetWorld()->GetRealTimeSeconds();
+		GEngine->AddOnScreenDebugMessage(1, 1.f, FColor::Red, FString::Printf(L"Send Time : %f", m_LastSendTime));
 	}
 }
 
@@ -396,22 +423,26 @@ void AInGameMode::SendRespawnItemToServer(const int32 & SpawnerID, const int32 &
 // Private Function
 
 void AInGameMode::SpawnCharacter() {
-	if (m_GameInstance && m_GameInstance->IsValidLowLevel() && m_SpawnPoint.Num() >= m_PlayerList.size()) {
-		for (int32 i = m_CharacterClass.Num(); i < m_PlayerList.size(); i++) {
-			AActor** SpawnPoint = FindSpawnPointByUniqueKey(m_PlayerList[i].m_UniqueKey);
+	AHANSEIRacingController* Controller = Cast<AHANSEIRacingController>(GetWorld()->GetFirstPlayerController());
 
-			if (SpawnPoint && IsValid(*SpawnPoint)) {
-				FVector Location = (*SpawnPoint)->GetActorLocation();
-				FRotator Rotation = (*SpawnPoint)->GetActorRotation();
-				FActorSpawnParameters Param;
-				Param.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-				auto NewPawn = GetWorld()->SpawnActor<ADefaultVehicleCharacter>(m_VehicleClass, Location, Rotation, Param);
+	if (m_GameInstance && m_GameInstance->IsValidLowLevel() && m_SpawnPoint.Num() >= m_PlayerList.size() && IsValid(Controller)) {
+		for (int32 i = 0; i < m_PlayerList.size(); i++) {
+			if (!m_CharacterClass.Find(m_PlayerList[i].m_UniqueKey)) {
+				AActor** SpawnPoint = FindSpawnPointByUniqueKey(m_PlayerList[i].m_UniqueKey);
 
-				if (NewPawn) {
-					SpawnPawnAndAddCharacterList(NewPawn, m_PlayerList[i].m_UniqueKey, m_PlayerList[i].m_PlayerNickName, m_PlayerList[i].m_RankInformation.m_CurrentRank);
-					if (m_CharacterClass.Num() == m_PlayerList.size()) {
-						RefreshInGameWidgetData();
-						m_bIsHaveToSpawnPlayer = false;
+				if (SpawnPoint && IsValid(*SpawnPoint)) {
+					FVector Location = (*SpawnPoint)->GetActorLocation();
+					FRotator Rotation = (*SpawnPoint)->GetActorRotation();
+					FActorSpawnParameters Param;
+					Param.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+					auto NewPawn = GetWorld()->SpawnActor<ADefaultVehicleCharacter>(m_VehicleClass, Location, Rotation, Param);
+
+					if (NewPawn) {
+						SpawnPawnAndAddCharacterList(NewPawn, m_PlayerList[i].m_UniqueKey, m_PlayerList[i].m_PlayerNickName, m_PlayerList[i].m_RankInformation.m_CurrentRank);
+						if (m_CharacterClass.Num() == m_PlayerList.size()) {
+							RefreshInGameWidgetData();
+							m_bIsHaveToSpawnPlayer = false;
+						}
 					}
 				}
 			}
@@ -446,6 +477,11 @@ void AInGameMode::UpdatePlayerLocationAndRotation() {
 					(*Character)->SetPlayerRank(It.m_RankInformation.m_CurrentRank);
 					bIsUpdatedRank = true;
 				}
+
+				if (It.m_bIsDead) {
+					m_CharacterClass.Remove(It.m_UniqueKey);
+					(*Character)->SetIsDead(true);
+				}
 			}
 		}
 
@@ -467,6 +503,8 @@ int32 AInGameMode::GetPacketSize(const PACKET* Packet) {
 		return sizeof(GAMEPACKET);
 	case EPACKETTYPE::EPT_SPAWNER:
 		return sizeof(SPAWNERPACKET);
+	case EPACKETTYPE::EPT_REDZONE:
+		return sizeof(REDZONEPACKET);
 	}
 	return 0;
 }
@@ -483,9 +521,14 @@ AActor** AInGameMode::FindSpawnPointByUniqueKey(const int32& UniqueKey) {
 }
 
 void AInGameMode::SpawnPawnAndAddCharacterList(ADefaultVehicleCharacter* NewPawn, const int32& UniqueKey, const ANSICHAR* PlayerName, const int32& PlayerRank) {
-	if (!m_Character && UniqueKey == m_GameInstance->GetUniqueKey()) {
+	if (!IsValid(m_Character) && UniqueKey == m_GameInstance->GetUniqueKey()) {
 		m_Character = NewPawn;
 		NewPawn->SetIsItPlayer(true);
+
+		if(m_bIsInGame){
+			AHANSEIRacingController* Controller = Cast<AHANSEIRacingController>(GetWorld()->GetFirstPlayerController());
+			Controller->Possess(NewPawn);
+		}
 	}
 	else {
 		NewPawn->SpawnDefaultController();

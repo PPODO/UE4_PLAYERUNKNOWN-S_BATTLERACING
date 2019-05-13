@@ -45,7 +45,7 @@ void AHANSEIRacingController::BeginDestroy() {
 }
 
 void AHANSEIRacingController::StartLocationSendTimer() {
-	GetWorld()->GetTimerManager().SetTimer(m_TimerHandle, this, &AHANSEIRacingController::IsItNearlyEqualActorInformation, 0.016f, true);
+	GetWorld()->GetTimerManager().SetTimer(m_TimerHandle, this, &AHANSEIRacingController::SendActorInformation, 0.016f, true);
 }
 
 void AHANSEIRacingController::StopLocationSendTimer() {
@@ -54,12 +54,12 @@ void AHANSEIRacingController::StopLocationSendTimer() {
 	}
 }
 
-void AHANSEIRacingController::IsItNearlyEqualActorInformation() {
+void AHANSEIRacingController::SendActorInformation() {
 	if (IsValid(m_Character) && IsValid(m_GameMode)) {
 		FVector ActorLocation = m_Character->GetActorLocation();
 		FRotator ActorRotation = m_Character->GetActorRotation();
 
-		m_GameMode->SendCharacterInformationToServer(ActorLocation, ActorRotation, m_ControllerData);
+		m_GameMode->SendCharacterInformationToServer(ActorLocation, ActorRotation, m_ControllerData, m_Character->GetCurrentHealth());
 	}
 }
 

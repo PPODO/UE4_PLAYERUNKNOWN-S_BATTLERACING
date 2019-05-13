@@ -18,6 +18,7 @@ protected:
 	virtual void Tick(float DeltaTime) override;
 	virtual void PossessedBy(class AController* NewController) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const & DamageEvent, class AController * EventInstigator, AActor * DamageCauser) override;
 
 private:
 	UFUNCTION()
@@ -43,6 +44,10 @@ private:
 		class UMaterial* m_DecalMaterial;
 
 private:
+	UPROPERTY(BlueprintReadOnly, Meta = (AllowPrivateAccess = true))
+		float m_Health;
+
+private:
 	TArray<class UMaterialInstance*> m_MaterialInstances;
 	TArray<const TCHAR*> m_ReferenceSrcs;
 
@@ -56,6 +61,7 @@ private:
 	FString m_PlayerNickName;
 	bool m_bIsDisconnect;
 	bool m_bIsPlayer;
+	bool m_bIsDead;
 
 private:
 	void SpawnTireDecal();
@@ -68,10 +74,15 @@ public:
 	FORCEINLINE void SetIsDisconnect(bool b) { m_bIsDisconnect = b; }
 	FORCEINLINE void SetVehicleState(const struct FInputMotionData& State) { m_VehicleState = State; }
 	FORCEINLINE void SetPlayerRank(const int32& NewRank) { m_PlayerCurrentRank = NewRank; }
+	FORCEINLINE void SetIsDead(const bool& b) { m_bIsDead = b; }
 
 public:
 	void SetMaterialFromUniqueKey(const int32& Index);
 	void SetPlayerName(const FString& Text);
+
+public:
+	FORCEINLINE bool GetIsPlayer() const { return m_bIsPlayer; }
+	FORCEINLINE float GetCurrentHealth() const { return m_Health; }
 
 public:
 	UFUNCTION(BlueprintCallable)
