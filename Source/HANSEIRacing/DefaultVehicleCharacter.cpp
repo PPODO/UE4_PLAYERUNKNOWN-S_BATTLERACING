@@ -167,13 +167,13 @@ void ADefaultVehicleCharacter::Tick(float DeltaTime) {
 		if (!m_bIsPlayer && GetVehicleMovement()) {
 /*			GetVehicleMovement()->SetThrottleInput(m_VehicleState.m_Throttle);
 			GetVehicleMovement()->SetSteeringInput(m_VehicleState.m_Steering);
-			GetVehicleMovement()->SetHandbrakeInput(m_VehicleState.m_HandBreak);*/
+			GetVehicleMovement()->SetHandbrakeInput(m_VehicleState.m_bIsBraking);*/
 		}
 		else if (m_Controller && m_bIsPlayer && GetVehicleMovementComponent()) {
 /*			FInputMotionData ControllerData = m_Controller->GetControllerData();
 			GetVehicleMovementComponent()->SetThrottleInput(ControllerData.m_Throttle);
 			GetVehicleMovementComponent()->SetSteeringInput(ControllerData.m_Steering);
-			GetVehicleMovementComponent()->SetHandbrakeInput(ControllerData.m_HandBreak);
+			GetVehicleMovementComponent()->SetHandbrakeInput(ControllerData.m_bIsBraking);
 */		}
 
 		SpawnTireDecal();
@@ -205,8 +205,8 @@ void ADefaultVehicleCharacter::SetupPlayerInputComponent(UInputComponent* Player
 	PlayerInputComponent->BindAxis("Forward", this, &ADefaultVehicleCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("Right", this, &ADefaultVehicleCharacter::MoveRight);
 
-	PlayerInputComponent->BindAction("HandBreak", IE_Pressed, this, &ADefaultVehicleCharacter::PressedHandBreak);
-	PlayerInputComponent->BindAction("HandBreak", IE_Released, this, &ADefaultVehicleCharacter::ReleaseHandBreak);
+	PlayerInputComponent->BindAction("Braking", IE_Pressed, this, &ADefaultVehicleCharacter::PressedBraking);
+	PlayerInputComponent->BindAction("Braking", IE_Released, this, &ADefaultVehicleCharacter::ReleaseBraking);
 }
 
 float ADefaultVehicleCharacter::TakeDamage(float DamageAmount, FDamageEvent const & DamageEvent, AController * EventInstigator, AActor * DamageCauser) {
@@ -228,11 +228,11 @@ void ADefaultVehicleCharacter::MoveRight(float Value) {
 	GetVehicleMovementComponent()->SetSteeringInput(Value);
 }
 
-void ADefaultVehicleCharacter::PressedHandBreak() {
+void ADefaultVehicleCharacter::PressedBraking() {
 	GetVehicleMovementComponent()->SetHandbrakeInput(true);
 }
 
-void ADefaultVehicleCharacter::ReleaseHandBreak() {
+void ADefaultVehicleCharacter::ReleaseBraking() {
 	GetVehicleMovementComponent()->SetHandbrakeInput(false);
 }
 
