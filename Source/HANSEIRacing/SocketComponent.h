@@ -20,16 +20,16 @@ struct FInputMotionData {
 public:
 	float m_Steering;
 	float m_Throttle;
-	bool m_HandBreak;
+	bool m_bIsBraking;
 
-	FInputMotionData() : m_Steering(0.f), m_Throttle(0.f), m_HandBreak(false) {};
-	FInputMotionData(float& Steering, float Throttle, bool HandBreak) : m_Steering(Steering), m_Throttle(Throttle), m_HandBreak(HandBreak) {};
+	FInputMotionData() : m_Steering(0.f), m_Throttle(0.f), m_bIsBraking(false) {};
+	FInputMotionData(float& Steering, float Throttle, bool bIsBraking) : m_Steering(Steering), m_Throttle(Throttle), m_bIsBraking(bIsBraking) {};
 };
 
 FORCEINLINE FArchive& operator<<(FArchive &Ar, FInputMotionData& TheStruct) {
 	Ar << TheStruct.m_Steering;
 	Ar << TheStruct.m_Throttle;
-	Ar << TheStruct.m_HandBreak;
+	Ar << TheStruct.m_bIsBraking;
 
 	return Ar;
 }
