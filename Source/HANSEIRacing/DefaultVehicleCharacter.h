@@ -27,9 +27,9 @@ private:
 		void MoveRight(float Value);
 
 	UFUNCTION()
-		void PressedHandBreak();
+		void PressedBraking();
 	UFUNCTION()
-		void ReleaseHandBreak();
+		void ReleaseBraking();
 
 private:
 	UPROPERTY()
