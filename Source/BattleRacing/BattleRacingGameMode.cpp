@@ -4,6 +4,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Kismet/KismetMathLibrary.h"
 
 ABattleRacingGameMode::ABattleRacingGameMode() {
 }
