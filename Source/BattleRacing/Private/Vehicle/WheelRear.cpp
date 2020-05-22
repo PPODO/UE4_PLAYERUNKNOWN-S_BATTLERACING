@@ -8,9 +8,9 @@ UWheelRear::UWheelRear() {
 	SteerAngle = 0.f;
 	bAffectedByHandbrake = true;
 
-	LatStiffMaxLoad = 6.25f;
-	LatStiffValue = 4.25f;
-	LongStiffValue = 1000.f;
+	LatStiffMaxLoad = 1.f;
+	LatStiffValue = 7.f;
+	LongStiffValue = 500.f;
 
 	SuspensionForceOffset = -15.f;
 	SuspensionMaxRaise = 8.f;

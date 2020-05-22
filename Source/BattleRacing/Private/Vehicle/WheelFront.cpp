@@ -5,12 +5,12 @@
 UWheelFront::UWheelFront() {
 	ShapeRadius = 18.f;
 	ShapeWidth = 15.f;
-	SteerAngle = 40.f;
+	SteerAngle = 60.f;
 	bAffectedByHandbrake = false;
 
-	LatStiffMaxLoad = 6.25f;
-	LatStiffValue = 4.5f;
-	LongStiffValue = 1000.f;
+	LatStiffMaxLoad = 1.f;
+	LatStiffValue = 7.f;
+	LongStiffValue = 500.f;
 
 	SuspensionForceOffset = -15.f;
 	SuspensionMaxRaise = 8.f;
