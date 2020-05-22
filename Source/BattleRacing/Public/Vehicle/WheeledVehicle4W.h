@@ -27,6 +27,7 @@ private:
 
 private:
 	void InitializeVehicle();
+	void UpdateVehicleGravity();
 	void CalculateEngineSound();
 
 private:
@@ -36,5 +37,12 @@ private:
 		class USpringArmComponent* mSpringArmComponent;
 	UPROPERTY(VisibleAnywhere, meta = (AllowPrivateAccess = "true"))
 		class UAudioComponent* mEngineSoundComponent;
+	UPROPERTY(EditAnywhere, Category = "Gravity", meta = (AllowPrivateAccess = "true"))
+		float mTraceMaxLength = 500.f;
+	UPROPERTY(EditAnywhere, Category = "Gravity", meta = (AllowPrivateAccess = "true"))
+		float mGravityScale = -19.62f;
+
+	UPROPERTY(EditAnywhere, meta = (AllowPrivateAccess = "true"))
+		bool mbIsUpdateCustomGravity = true;
 
 };

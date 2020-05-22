@@ -9,6 +9,7 @@
 #include "Sound/SoundCue.h"
 #include "WheeledVehicleMovementComponent4W.h"
 #include "UObject/ConstructorHelpers.h"
+#include "DrawDebugHelpers.h"
 #include "Engine/Engine.h"
 
 AWheeledVehicle4W::AWheeledVehicle4W() {
@@ -20,6 +21,7 @@ AWheeledVehicle4W::AWheeledVehicle4W() {
 		GetMesh()->SetSkeletalMesh(vehicleMesh.Object);
 		GetMesh()->SetAnimInstanceClass(vehicleAnim.Class);
 		GetMesh()->SetCenterOfMass(FVector(-0.f, 0.f, -0.f));
+		GetMesh()->SetEnableGravity(false);
 	}
 	if (engineSound.Succeeded()) {
 		mEngineSoundComponent = CreateDefaultSubobject<UAudioComponent>(L"Engine Sound Component");
@@ -57,6 +59,8 @@ void AWheeledVehicle4W::BeginPlay() {
 void AWheeledVehicle4W::Tick(float deltaTime) {
 	Super::Tick(deltaTime);
 
+	if (mbIsUpdateCustomGravity)
+		UpdateVehicleGravity();
 	CalculateEngineSound();
 }
 
@@ -112,7 +116,7 @@ void AWheeledVehicle4W::InitializeVehicle() {
 	vehicleMovement->MaxNormalizedTireLoad = 2.f;
 	vehicleMovement->MaxNormalizedTireLoadFiltered = 2.0f;
 
-	vehicleMovement->MaxEngineRPM = 6000.f;
+	vehicleMovement->MaxEngineRPM = 5730.f;
 	vehicleMovement->EngineSetup.TorqueCurve.GetRichCurve()->Reset();
 	vehicleMovement->EngineSetup.TorqueCurve.GetRichCurve()->AddKey(0.f, 400.f);
 	vehicleMovement->EngineSetup.TorqueCurve.GetRichCurve()->AddKey(1890.f, 500.f);
@@ -120,8 +124,8 @@ void AWheeledVehicle4W::InitializeVehicle() {
 
 	vehicleMovement->SteeringCurve.GetRichCurve()->Reset();
 	vehicleMovement->SteeringCurve.GetRichCurve()->AddKey(0.f, 1.f);
-	vehicleMovement->SteeringCurve.GetRichCurve()->AddKey(30.f, 0.7f);
-	vehicleMovement->SteeringCurve.GetRichCurve()->AddKey(120.f, 0.5f);
+	vehicleMovement->SteeringCurve.GetRichCurve()->AddKey(30.f, 0.9f);
+	vehicleMovement->SteeringCurve.GetRichCurve()->AddKey(120.f, 0.7f);
 
 	vehicleMovement->DifferentialSetup.DifferentialType = EVehicleDifferential4W::LimitedSlip_4W;
 
@@ -137,6 +141,25 @@ void AWheeledVehicle4W::InitializeVehicle() {
 		UpdatedPrimitive->BodyInstance.COMNudge = FVector(8.f, 0.f, 0.f);
 	}
 	vehicleMovement->InertiaTensorScale = FVector(1.f, 1.333f, 1.2f);
+}
+
+void AWheeledVehicle4W::UpdateVehicleGravity() {
+	if (GetMesh()) {
+		bool bIsEnableGravity = true;
+		FHitResult TraceHitResult;
+		FVector StartLocation = GetActorLocation() + (GetMesh()->GetUpVector() * 25.f);
+		FVector EndLocation = GetActorLocation() + (GetMesh()->GetUpVector() * -1.f * mTraceMaxLength);
+		FCollisionQueryParams CollisionQueryParam(L"Hit test", false, this);
+		DrawDebugLine(GetWorld(), StartLocation, EndLocation, FColor::Blue, true, 10.f, 0, 5.f);
+		if (GetWorld() && GetWorld()->LineTraceSingleByChannel(TraceHitResult, StartLocation, EndLocation, ECollisionChannel::ECC_Visibility, CollisionQueryParam)) {
+			auto Gravity = (TraceHitResult.Normal * mGravityScale);
+			GetMesh()->SetPhysicsLinearVelocity(Gravity, true);
+			bIsEnableGravity = false;
+		}
+		if (GetMesh()->IsGravityEnabled() != bIsEnableGravity) {
+			GetMesh()->SetEnableGravity(bIsEnableGravity);
+		}
+	}
 }
 
 void AWheeledVehicle4W::CalculateEngineSound() {
