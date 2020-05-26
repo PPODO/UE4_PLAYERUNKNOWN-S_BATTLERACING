@@ -18,6 +18,7 @@ void UDefaultGameInstance::CreateLobbyWidget() {
 	if (auto LobbyWidget = CreateWidget<ULobbyUI>(this, mLobbyUISubclass)) {
 		mLobbyUIInstance = LobbyWidget;
 		mLobbyUIInstance->AddToViewport();
+		mLobbyUIInstance->SetVisibility(ESlateVisibility::Collapsed);
 		if (auto TargetViewCameraActor = UGameplayStatics::GetActorOfClass(GetWorld(), ACameraActor::StaticClass())) {
 			GetFirstLocalPlayerController()->SetViewTarget(TargetViewCameraActor);
 		}
@@ -27,5 +28,11 @@ void UDefaultGameInstance::CreateLobbyWidget() {
 void UDefaultGameInstance::RemoveLobbyWidget() {
 	if (mLobbyUIInstance) {
 		mLobbyUIInstance->RemoveFromParent();
+	}
+}
+
+void UDefaultGameInstance::SetLobbyWidgetVisibility(ESlateVisibility visibility) {
+	if (mLobbyUIInstance) {
+		mLobbyUIInstance->SetVisibility(visibility);
 	}
 }

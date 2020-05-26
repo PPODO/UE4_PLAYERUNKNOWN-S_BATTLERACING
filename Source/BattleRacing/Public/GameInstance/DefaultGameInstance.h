@@ -15,9 +15,16 @@ public:
 		void CreateLobbyWidget();
 	UFUNCTION(BlueprintCallable)
 		void RemoveLobbyWidget();
+	UFUNCTION(BlueprintCallable)
+		void SetLobbyWidgetVisibility(enum ESlateVisibility visibility);
 
 public:
 	FORCEINLINE class ULobbyUI* GetLobbyUIInstance() { return mLobbyUIInstance; }
+	FORCEINLINE const FString& GetPlayerNickname() { return mPlayerNickname; }
+
+private:
+	UPROPERTY(BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+		FString mPlayerNickname;
 
 private:
 	TSubclassOf<class ULobbyUI> mLobbyUISubclass;
